@@ -162,9 +162,28 @@ Failed:
                     ws.Hyperlinks.Add Anchor:=ws.Cells(CLng(rollbackItem("Row")), COL_LINK), _
                         Address:=CStr(rollbackItem("OldPath")), TextToDisplay:="Открыть файл"
                 End If
+                ' Keep the journal consistent with the actual file state after rollback.
+                If Not logWs Is Nothing And Len(batchId) > 0 Then
+                    For r = 2 To logWs.Cells(logWs.Rows.Count, 1).End(xlUp).Row
+                        If Trim$(CStr(logWs.Cells(r, 8).Value)) = batchId And _
+                           StrComp(CStr(logWs.Cells(r, 4).Value), CStr(rollbackItem("OldPath")), vbTextCompare) = 0 Then
+                            logWs.Cells(r, 7).Value = "Автоматически отменён после прерывания"
+                            Exit For
+                        End If
+                    Next r
+                End If
             Else
                 problems = problems & "Не удалось автоматически отменить: " & CStr(rollbackItem("NewPath")) & _
                            " (" & rollbackError & ")" & vbCrLf
+                If Not logWs Is Nothing And Len(batchId) > 0 Then
+                    For r = 2 To logWs.Cells(logWs.Rows.Count, 1).End(xlUp).Row
+                        If Trim$(CStr(logWs.Cells(r, 8).Value)) = batchId And _
+                           StrComp(CStr(logWs.Cells(r, 4).Value), CStr(rollbackItem("OldPath")), vbTextCompare) = 0 Then
+                            logWs.Cells(r, 7).Value = "Ошибка автоматического отката: " & rollbackError
+                            Exit For
+                        End If
+                    Next r
+                End If
             End If
         Next rollbackItem
     End If
