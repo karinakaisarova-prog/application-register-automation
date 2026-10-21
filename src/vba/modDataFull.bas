@@ -13,6 +13,9 @@ Private Const OUTPUT_SHEET As String = "data_full"
 Public Sub BuildDataFull()
     Dim sourceWs As Worksheet
     Dim outputWs As Worksheet
+    Dim backupWs As Worksheet
+    Dim outputWasExisting As Boolean
+    Dim operationCompleted As Boolean
     Dim lastRow As Long
     Dim r As Long
     Dim sectionText As String
@@ -62,7 +65,20 @@ Public Sub BuildDataFull()
         Application.StatusBar = "Формирование data_full: строка " & r & " из " & lastRow
     Next r
 
-    Set outputWs = GetOrCreateDataFullSheet()
+    On Error Resume Next
+    Set outputWs = ThisWorkbook.Worksheets(OUTPUT_SHEET)
+    On Error GoTo Failed
+    outputWasExisting = Not outputWs Is Nothing
+
+    ' Keep a full worksheet copy until the rebuild has completed successfully.
+    If outputWasExisting Then
+        outputWs.Copy After:=ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count)
+        Set backupWs = ActiveSheet
+        backupWs.Name = "data_full__backup"
+    Else
+        Set outputWs = GetOrCreateDataFullSheet()
+    End If
+
     outputWs.Cells.Clear
     outputWs.Range("A1:B1").Value = Array("Раздел", "Ответственное лицо")
     outRow = 2
@@ -100,14 +116,41 @@ Public Sub BuildDataFull()
     End With
     outputWs.Columns("A:B").AutoFit
     outputWs.Activate
+    operationCompleted = True
+    If Not backupWs Is Nothing Then
+        Application.DisplayAlerts = False
+        backupWs.Delete
+        Application.DisplayAlerts = oldAlerts
+        Set backupWs = Nothing
+    End If
     MsgBox "Лист data_full обновлён. Уникальных пар: " & pairs.Count, vbInformation
     GoTo CleanExit
 
 Failed:
-    If Err.Number = 18 Then
-        MsgBox "Формирование data_full отменено пользователем.", vbInformation
+    Dim failureText As String
+    Dim wasCancelled As Boolean
+    failureText = Err.Description
+    wasCancelled = (Err.Number = 18)
+
+    ' Restore the previous output if an error or Ctrl+Break occurs mid-rebuild.
+    On Error Resume Next
+    Application.DisplayAlerts = False
+    If Not backupWs Is Nothing Then
+        If Not outputWs Is Nothing Then outputWs.Delete
+        backupWs.Name = OUTPUT_SHEET
+        Set outputWs = backupWs
+        Set backupWs = Nothing
+    ElseIf Not outputWasExisting And Not outputWs Is Nothing And Not operationCompleted Then
+        outputWs.Delete
+    End If
+    Application.DisplayAlerts = oldAlerts
+    On Error GoTo 0
+
+    If wasCancelled Then
+        MsgBox "Формирование data_full отменено пользователем. Предыдущий лист восстановлен, если он существовал.", vbInformation
     Else
-        MsgBox "Не удалось сформировать data_full: " & Err.Description, vbExclamation
+        MsgBox "Не удалось сформировать data_full: " & failureText & _
+               IIf(outputWasExisting, vbCrLf & "Предыдущий лист восстановлен, если операция успела изменить его.", ""), vbExclamation
     End If
 
 CleanExit:
