@@ -18,7 +18,6 @@ Private Const DATA_SHEET_NAME As String = "data"
 
 Private mFiles As Collection
 Private mSections As Object
-Private mSeenPaths As Object
 Private mLogText As String
 Private mRootPath As String
 
