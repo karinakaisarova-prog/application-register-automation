@@ -27,6 +27,8 @@ Public Sub CheckAndFixWordBulletLists()
     Dim cancelled As Boolean
     Dim answer As VbMsgBoxResult
     Dim groupsFound As Long, paragraphsFound As Long, paragraphsFixed As Long
+    Dim backupPath As String
+    Dim changesStarted As Boolean
 
     oldScreen = Application.ScreenUpdating
     oldEvents = Application.EnableEvents
@@ -138,6 +140,12 @@ Public Sub CheckAndFixWordBulletLists()
         GoTo CleanExit
     End If
 
+    ' Create a same-folder backup only after the user confirms the proposed changes.
+    backupPath = CreateBulletBackupPath(reportPath)
+    FileCopy reportPath, backupPath
+    LogBulletBackup ws, backupPath
+    changesStarted = True
+
     ' Process groups from the end of the document backwards so earlier paragraph indexes remain valid.
     Dim groupStartRows() As Long, groupEndRows() As Long, groupCount As Long
     Dim rr As Long, priorGroup As Variant
@@ -201,10 +209,17 @@ Failed:
     cancelled = (Err.Number = 18)
     errText = Err.Description
     On Error Resume Next
-    If Not wdDoc Is Nothing Then
-        If Not cancelled Then wdDoc.Close False
-    End If
+    If Not wdDoc Is Nothing Then wdDoc.Close False
     If Not wdApp Is Nothing Then wdApp.Quit
+    If changesStarted And Len(backupPath) > 0 Then
+        FileCopy backupPath, reportPath
+        If Err.Number = 0 Then
+            LogBulletBackup ws, "Исходный файл восстановлен из копии: " & backupPath
+        Else
+            Err.Clear
+            LogBulletBackup ws, "Автовосстановление не удалось. Резервная копия сохранена: " & backupPath
+        End If
+    End If
     On Error GoTo 0
     If cancelled Then
         MsgBox "Операция отменена. Если изменения уже начались, проверьте документ и восстановите копию при необходимости.", _
@@ -223,6 +238,38 @@ CleanExit:
     Application.DisplayAlerts = oldAlerts
     Application.StatusBar = False
     Application.EnableCancelKey = xlInterrupt
+End Sub
+
+Private Function CreateBulletBackupPath(ByVal sourcePath As String) As String
+    Dim fso As Object
+    Dim parentFolder As String
+    Dim baseName As String
+    Dim extension As String
+    Dim candidate As String
+    Dim suffix As Long
+
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    parentFolder = fso.GetParentFolderName(sourcePath)
+    baseName = fso.GetBaseName(sourcePath)
+    extension = fso.GetExtensionName(sourcePath)
+    candidate = fso.BuildPath(parentFolder, baseName & "_backup_" & Format$(Now, "yyyymmdd_hhnnss") & "." & extension)
+    suffix = 1
+    Do While fso.FileExists(candidate)
+        candidate = fso.BuildPath(parentFolder, baseName & "_backup_" & Format$(Now, "yyyymmdd_hhnnss") & "_" & suffix & "." & extension)
+        suffix = suffix + 1
+    Loop
+    CreateBulletBackupPath = candidate
+End Function
+
+Private Sub LogBulletBackup(ByVal ws As Worksheet, ByVal message As String)
+    Dim nextRow As Long
+    On Error Resume Next
+    nextRow = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row + 1
+    If nextRow < FIRST_DATA_ROW Then nextRow = FIRST_DATA_ROW
+    ws.Cells(nextRow, 1).Value = "Резервная копия"
+    ws.Cells(nextRow, 5).Value = message
+    ws.Cells(nextRow, 6).Value = Now
+    On Error GoTo 0
 End Sub
 
 Private Function GetTypedMarker(ByVal paragraphText As String, ByRef markerOffset As Long, ByRef markerLength As Long) As Boolean
