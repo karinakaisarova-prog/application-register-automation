@@ -31,10 +31,14 @@ Public Sub ScanWordReportMentions()
     Dim oldAlerts As Boolean
     Dim errText As String
     Dim cancelled As Boolean
+    Dim oldStatusBar As Variant
+    Dim oldCancelKey As XlEnableCancelKey
 
     oldScreen = Application.ScreenUpdating
     oldEvents = Application.EnableEvents
     oldAlerts = Application.DisplayAlerts
+    oldStatusBar = Application.StatusBar
+    oldCancelKey = Application.EnableCancelKey
     On Error GoTo Failed
     Application.EnableCancelKey = xlErrorHandler
     Application.ScreenUpdating = False
@@ -163,8 +167,8 @@ RestoreExcel:
     Application.ScreenUpdating = oldScreen
     Application.EnableEvents = oldEvents
     Application.DisplayAlerts = oldAlerts
-    Application.StatusBar = False
-    Application.EnableCancelKey = xlInterrupt
+    Application.StatusBar = oldStatusBar
+    Application.EnableCancelKey = oldCancelKey
 End Sub
 
 Public Sub CountPagesForRegister()
@@ -185,10 +189,14 @@ Public Sub CountPagesForRegister()
     Dim failed As Long
     Dim oldPageValues As Variant
     Dim pageSnapshotTaken As Boolean
+    Dim oldStatusBar As Variant
+    Dim oldCancelKey As XlEnableCancelKey
 
     oldScreen = Application.ScreenUpdating
     oldEvents = Application.EnableEvents
     oldAlerts = Application.DisplayAlerts
+    oldStatusBar = Application.StatusBar
+    oldCancelKey = Application.EnableCancelKey
     On Error GoTo Failed
     Application.EnableCancelKey = xlErrorHandler
     Application.ScreenUpdating = False
@@ -290,8 +298,8 @@ CleanExit:
     Application.ScreenUpdating = oldScreen
     Application.EnableEvents = oldEvents
     Application.DisplayAlerts = oldAlerts
-    Application.StatusBar = False
-    Application.EnableCancelKey = xlInterrupt
+    Application.StatusBar = oldStatusBar
+    Application.EnableCancelKey = oldCancelKey
 End Sub
 
 Private Function GetFileExtensionFromPath(ByVal filePath As String) As String
