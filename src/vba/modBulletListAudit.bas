@@ -48,7 +48,7 @@ Public Sub CheckAndFixWordBulletLists()
 
     Set wdApp = CreateObject("Word.Application")
     wdApp.Visible = False
-    Set wdDoc = wdApp.Documents.Open(reportPath, False, True, False)
+    Set wdDoc = wdApp.Documents.Open(reportPath, False, False, False)
 
     Set ws = GetOrCreateBulletReportSheet(BULLET_REPORT_SHEET)
     ws.Cells.Clear
@@ -139,10 +139,6 @@ Public Sub CheckAndFixWordBulletLists()
     End If
 
     ' Process groups from the end of the document backwards so earlier paragraph indexes remain valid.
-    For i = pCount To 1 Step -1
-        If IsNumeric(ws.Cells(FIRST_DATA_ROW, 6).Value) Then Exit For
-    Next i
-
     Dim groupStartRows() As Long, groupEndRows() As Long, groupCount As Long
     Dim rr As Long, priorGroup As Variant
     ReDim groupStartRows(1 To groupsFound)
