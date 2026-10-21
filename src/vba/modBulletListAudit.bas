@@ -201,7 +201,8 @@ Public Sub CheckAndFixWordBulletLists()
     MsgBox "Исправление завершено." & vbCrLf & _
            "Групп преобразовано: " & groupCount & vbCrLf & _
            "Абзацев обработано: " & paragraphsFixed & vbCrLf & _
-           "Документ сохранён. Проверьте визуально отступы и переносы.", _
+           "Документ сохранён. Проверьте визуально отступы и переносы." & vbCrLf & _
+           "Резервная копия: " & backupPath, _
            vbInformation, "Маркированные списки Word"
     GoTo CleanExit
 
