@@ -20,6 +20,7 @@ Public Sub BuildDataFull()
     Dim key As String
     Dim pairs As Object
     Dim item As Variant
+    Dim pairValue As Variant
     Dim outRow As Long
     Dim oldScreen As Boolean
     Dim oldEvents As Boolean
@@ -66,8 +67,9 @@ Public Sub BuildDataFull()
     outputWs.Range("A1:B1").Value = Array("Раздел", "Ответственное лицо")
     outRow = 2
     For Each item In pairs.Keys
-        outputWs.Cells(outRow, 1).Value = pairs(item)(0)
-        outputWs.Cells(outRow, 2).Value = pairs(item)(1)
+        pairValue = pairs(item)
+        outputWs.Cells(outRow, 1).Value = pairValue(0)
+        outputWs.Cells(outRow, 2).Value = pairValue(1)
         outRow = outRow + 1
     Next item
 
