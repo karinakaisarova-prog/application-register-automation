@@ -58,7 +58,7 @@ Public Sub RenameFilesFromRegister()
             GoTo ContinueRow
         End If
 
-        ext = Mid$(oldPath, InStrRev(oldPath, "."))
+        ext = FileExtensionFromPath(oldPath)
         newName = CleanFileName(objectName & "_Приложение № " & appNo & "_" & titleText) & ext
         newPath = Left$(oldPath, InStrRev(oldPath, Application.PathSeparator)) & newName
         If StrComp(oldPath, newPath, vbTextCompare) = 0 Then GoTo ContinueRow
@@ -238,10 +238,27 @@ Private Function RegisterFilePath(ByVal c As Range) As String
     On Error Resume Next
     If c.Hyperlinks.Count > 0 Then
         RegisterFilePath = CStr(c.Hyperlinks(1).Address)
+        If Len(RegisterFilePath) = 0 Then RegisterFilePath = CStr(c.Hyperlinks(1).SubAddress)
     Else
         RegisterFilePath = CStr(c.Value)
     End If
     On Error GoTo 0
+    RegisterFilePath = NormalizeRegisterPath(RegisterFilePath)
+End Function
+
+Private Function NormalizeRegisterPath(ByVal value As String) As String
+    value = Trim$(value)
+    If LCase$(Left$(value, 8)) = "file:///" Then value = Mid$(value, 9)
+    value = Replace(value, "%20", " ")
+    value = Replace(value, "/", "\")
+    NormalizeRegisterPath = value
+End Function
+
+Private Function FileExtensionFromPath(ByVal filePath As String) As String
+    Dim slashPos As Long, dotPos As Long
+    slashPos = InStrRev(filePath, Application.PathSeparator)
+    dotPos = InStrRev(filePath, ".")
+    If dotPos > slashPos Then FileExtensionFromPath = Mid$(filePath, dotPos)
 End Function
 
 Private Function CleanFileName(ByVal value As String) As String
