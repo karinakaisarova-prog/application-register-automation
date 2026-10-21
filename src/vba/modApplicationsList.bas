@@ -182,12 +182,12 @@ Private Function ParseFileName(ByVal fileName As String) As Object
     Set rx = CreateObject("VBScript.RegExp")
     rx.Global = False
     rx.IgnoreCase = True
-    rx.Pattern = "приложени[ея]s*№?s*([0-9]+[А-ЯA-Z]?)"
+    rx.Pattern = "приложени[ея]\\s*№?\\s*([0-9]+[А-ЯA-Z]?)"
     If rx.Test(baseName) Then
         Set matches = rx.Execute(baseName)
         appNumber = matches(0).SubMatches(0)
         p = InStr(1, baseName, matches(0).Value, vbTextCompare)
-        titleText = Trim$(Left$(baseName, p - 1) & " " & Mid$(baseName, p + Len(matches(0).Value)))
+        titleText = Trim$(Mid$(baseName, p + Len(matches(0).Value)))
         titleText = Replace(titleText, "_", " ")
         titleText = Trim$(titleText)
         If Left$(titleText, 1) = "_" Then titleText = Mid$(titleText, 2)
@@ -358,6 +358,7 @@ Private Function IsSpecialDepartmentFile(ByVal fileNameOrNumber As String, ByVal
     s = LCase$(fileNameOrNumber & " " & titleText)
     IsSpecialDepartmentFile = (InStr(1, s, "отчет_2 кв 2026", vbTextCompare) > 0 Or _
                                InStr(1, s, "отчет 2 кв 2026", vbTextCompare) > 0 Or _
+                               InStr(1, s, "2 кв 2026", vbTextCompare) > 0 Or _
                                InStr(1, s, "реестр рисков", vbTextCompare) > 0)
 End Function
 
