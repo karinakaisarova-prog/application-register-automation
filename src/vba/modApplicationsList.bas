@@ -132,19 +132,24 @@ Private Sub CollectFiles(ByVal rootPath As String, ByVal currentPath As String, 
     For Each fileItem In folder.Files
         ext = LCase$(fso.GetExtensionName(fileItem.Name))
         If IsSupportedExtension(ext) Then
-            Set info = ParseFileName(CStr(fileItem.Name))
-            objectName = GetObjectName(rootPath, currentPath)
-            Dim rec As Object
-            Set rec = CreateObject("Scripting.Dictionary")
-            rec("Path") = CStr(fileItem.Path)
-            rec("FileName") = CStr(fileItem.Name)
-            rec("Extension") = ext
-            rec("Object") = objectName
-            rec("AppNumber") = CStr(info("AppNumber"))
-            rec("Title") = CStr(info("Title"))
-            rec("IsReport") = IsMainReport(CStr(fileItem.Name))
-            rec("Folder") = CStr(currentPath)
-            mFiles.Add rec
+            If Not mSeenPaths.Exists(CStr(fileItem.Path)) Then
+                mSeenPaths.Add CStr(fileItem.Path), True
+                Set info = ParseFileName(CStr(fileItem.Name))
+                objectName = GetObjectName(rootPath, currentPath)
+                Dim rec As Object
+                Set rec = CreateObject("Scripting.Dictionary")
+                rec("Path") = CStr(fileItem.Path)
+                rec("FileName") = CStr(fileItem.Name)
+                rec("Extension") = ext
+                rec("Object") = objectName
+                rec("AppNumber") = CStr(info("AppNumber"))
+                rec("Title") = CStr(info("Title"))
+                rec("IsReport") = IsMainReport(CStr(fileItem.Name))
+                rec("Folder") = CStr(currentPath)
+                mFiles.Add rec
+            Else
+                LogLine "Повторный путь пропущен: " & CStr(fileItem.Path)
+            End If
         End If
     Next fileItem
 
