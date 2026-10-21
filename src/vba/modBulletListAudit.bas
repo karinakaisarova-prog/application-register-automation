@@ -213,6 +213,7 @@ Failed:
     If Not wdDoc Is Nothing Then wdDoc.Close False
     If Not wdApp Is Nothing Then wdApp.Quit
     If changesStarted And Len(backupPath) > 0 Then
+        Err.Clear
         FileCopy backupPath, reportPath
         If Err.Number = 0 Then
             LogBulletBackup ws, "Исходный файл восстановлен из копии: " & backupPath
