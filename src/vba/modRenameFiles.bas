@@ -21,10 +21,18 @@ Public Sub RenameFilesFromRegister()
     Dim preview As String, problems As String, failure As String, batchId As String
     Dim renamed As Long, failed As Long
     Dim oldScreen As Boolean, oldEvents As Boolean, oldAlerts As Boolean
+    Dim oldStatusBar As Variant
+    Dim oldCancelKey As XlEnableCancelKey
+    Dim renamedItems As Collection
+    Dim rollbackItem As Variant
+    Dim rollbackError As String
 
     oldScreen = Application.ScreenUpdating
     oldEvents = Application.EnableEvents
     oldAlerts = Application.DisplayAlerts
+    oldStatusBar = Application.StatusBar
+    oldCancelKey = Application.EnableCancelKey
+    Set renamedItems = New Collection
     On Error GoTo Failed
     Application.EnableCancelKey = xlErrorHandler
     Application.ScreenUpdating = False
@@ -117,6 +125,7 @@ ContinueRow:
         logWs.Cells(logRow, 5).Value = item("NewName")
         logWs.Cells(logRow, 6).Value = item("NewPath")
         If Len(failure) = 0 Then
+            renamedItems.Add item
             On Error Resume Next
             ws.Cells(CLng(item("Row")), COL_LINK).Hyperlinks.Delete
             ws.Hyperlinks.Add Anchor:=ws.Cells(CLng(item("Row")), COL_LINK), _
@@ -140,13 +149,36 @@ ContinueRow:
     GoTo CleanExit
 
 Failed:
-    MsgBox "Операция переименования прервана: " & Err.Description, vbExclamation
+    failure = Err.Description
+    If Err.Number = 18 Then failure = "Операция отменена пользователем (Ctrl+Break)."
+    ' If a batch was interrupted, reverse every rename completed in this run.
+    On Error Resume Next
+    If Not renamedItems Is Nothing Then
+        For Each rollbackItem In renamedItems
+            rollbackError = TryRenameFile(CStr(rollbackItem("NewPath")), CStr(rollbackItem("OldPath")))
+            If Len(rollbackError) = 0 Then
+                If Not ws Is Nothing Then
+                    ws.Cells(CLng(rollbackItem("Row")), COL_LINK).Hyperlinks.Delete
+                    ws.Hyperlinks.Add Anchor:=ws.Cells(CLng(rollbackItem("Row")), COL_LINK), _
+                        Address:=CStr(rollbackItem("OldPath")), TextToDisplay:="Открыть файл"
+                End If
+            Else
+                problems = problems & "Не удалось автоматически отменить: " & CStr(rollbackItem("NewPath")) & _
+                           " (" & rollbackError & ")" & vbCrLf
+            End If
+        Next rollbackItem
+    End If
+    On Error GoTo 0
+    MsgBox failure & vbCrLf & _
+           IIf(Len(problems) > 0, "Проблемы и пропуски:" & vbCrLf & problems & vbCrLf, "") & _
+           "Выполненные в этом запуске переименования автоматически отменены, где это удалось. " & _
+           "Проверьте журнал и пути файлов.", vbExclamation
 CleanExit:
     Application.ScreenUpdating = oldScreen
     Application.EnableEvents = oldEvents
     Application.DisplayAlerts = oldAlerts
-    Application.StatusBar = False
-    Application.EnableCancelKey = xlInterrupt
+    Application.StatusBar = oldStatusBar
+    Application.EnableCancelKey = oldCancelKey
 End Sub
 
 Public Sub RollbackLastRenameBatch()
