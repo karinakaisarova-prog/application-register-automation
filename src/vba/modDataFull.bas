@@ -74,7 +74,7 @@ Public Sub BuildDataFull()
     If outputWasExisting Then
         outputWs.Copy After:=ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count)
         Set backupWs = ActiveSheet
-        backupWs.Name = "data_full__backup"
+        backupWs.Name = "df_bak_" & Format$(Now, "yymmddhhnnss")
     Else
         Set outputWs = GetOrCreateDataFullSheet()
     End If
