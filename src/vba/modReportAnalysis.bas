@@ -52,7 +52,12 @@ Public Sub ScanWordReportMentions()
     Set wdDoc = wdApp.Documents.Open(reportPath, False, True, False)
     Set ws = GetOrCreateReportSheet(RESULT_SHEET)
     ws.Cells.Clear
-    ws.Range("A1:F1").Value = Array("№", "Упоминание", "Страница", "Уровень структуры", "Текст абзаца", "Файл отчёта")
+    ws.Cells(1, 1).Value = "№"
+    ws.Cells(1, 2).Value = "Упоминание"
+    ws.Cells(1, 3).Value = "Страница"
+    ws.Cells(1, 4).Value = "Уровень структуры"
+    ws.Cells(1, 5).Value = "Текст абзаца"
+    ws.Cells(1, 6).Value = "Файл отчёта"
     rowOut = FIRST_RESULT_ROW
 
     Set rx = CreateObject("VBScript.RegExp")
@@ -176,7 +181,14 @@ Public Sub CountPagesForRegister()
                     wb.Close False
                     Set wb = Nothing
                 Case "pdf"
-                    ws.Cells(r, 10).Value = "Требуется PDF-инструмент"
+                    pages = CountPdfPagesWithAcrobat(filePath)
+                    If IsNumeric(pages) Then
+                        ws.Cells(r, 10).Value = pages
+                        completed = completed + 1
+                    Else
+                        ws.Cells(r, 10).Value = "Требуется Acrobat Pro/Standard"
+                        failed = failed + 1
+                    End If
                     GoTo NextRow
                 Case Else
                     ws.Cells(r, 10).Value = "Неподдерживаемый формат"
@@ -195,7 +207,7 @@ NextRow:
 
     MsgBox "Подсчёт завершён." & vbCrLf & "Обработано: " & completed & _
            vbCrLf & "Проблемы: " & failed & _
-           vbCrLf & "Для PDF требуется отдельный установленный инструмент; этот макрос не запускает неизвестные программы.", _
+           vbCrLf & "Для подсчёта PDF требуется установленный Adobe Acrobat Pro/Standard с COM-интерфейсом; Reader может не поддерживать этот вызов.", _
            vbInformation, "Подсчёт страниц"
     GoTo CleanExit
 
@@ -230,6 +242,25 @@ CleanExit:
     Application.StatusBar = False
     Application.EnableCancelKey = xlInterrupt
 End Sub
+
+Private Function CountPdfPagesWithAcrobat(ByVal pdfPath As String) As Variant
+    Dim pdfDoc As Object
+    On Error GoTo PdfUnavailable
+    Set pdfDoc = CreateObject("AcroExch.PDDoc")
+    If pdfDoc.Open(pdfPath) Then
+        CountPdfPagesWithAcrobat = CLng(pdfDoc.GetNumPages)
+        pdfDoc.Close
+    Else
+        CountPdfPagesWithAcrobat = Empty
+    End If
+    Set pdfDoc = Nothing
+    Exit Function
+PdfUnavailable:
+    On Error Resume Next
+    If Not pdfDoc Is Nothing Then pdfDoc.Close
+    Set pdfDoc = Nothing
+    CountPdfPagesWithAcrobat = Empty
+End Function
 
 Private Function CountWorkbookPrintPages(ByVal wb As Workbook) As Long
     Dim sh As Worksheet
