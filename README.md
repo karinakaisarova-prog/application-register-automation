@@ -1,0 +1,1 @@
+# application-register-automation
