@@ -208,9 +208,10 @@ Private Function ParseFileName(ByVal fileName As String) As Object
         Do While Len(titleText) > 0 And (Left$(titleText, 1) = "-" Or Left$(titleText, 1) = "—")
             titleText = Trim$(Mid$(titleText, 2))
         Loop
-    ElseIf LCase$(Left$(baseName, 6)) = "отчет_" Then
+    ElseIf IsMainReport(baseName) Then
         titleText = Mid$(baseName, 7)
         appNumber = ""
+        titleText = Replace(titleText, "_", " ")
     Else
         titleText = Replace(baseName, "_", " ")
     End If
