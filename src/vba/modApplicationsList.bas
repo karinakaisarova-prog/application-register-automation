@@ -243,9 +243,9 @@ Private Function GetObjectName(ByVal rootPath As String, ByVal currentPath As St
     rootPath = RemoveTrailingSlash(rootPath)
     folderPath = RemoveTrailingSlash(currentPath)
 
-    ' Check folder names first, starting with the deepest folder and moving
-    ' upward through the selected root. Do not infer an object from a random folder name.
-    Do
+    ' Check folder names first, from the deepest folder all the way through
+    ' its ancestors. This also works when the user selects a subfolder inside an object folder.
+    Do While Len(folderPath) > 0
         folderName = GetFolderName(folderPath)
         candidate = FindObjectInText(folderName, objectNames)
         If Len(candidate) > 0 Then
@@ -253,10 +253,7 @@ Private Function GetObjectName(ByVal rootPath As String, ByVal currentPath As St
             Exit Function
         End If
 
-        If StrComp(folderPath, rootPath, vbTextCompare) = 0 Then Exit Do
-        If Len(folderPath) <= Len(rootPath) Then Exit Do
         folderPath = fso.GetParentFolderName(folderPath)
-        If Len(folderPath) = 0 Then Exit Do
     Loop
 
     ' Only if no approved object was found in any folder, check the file name.
