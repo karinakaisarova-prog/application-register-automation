@@ -170,6 +170,7 @@ Public Sub CheckAndNumberWordTables()
     MsgBox "Обработка завершена." & vbCrLf & _
            "Подписей добавлено: " & insertedCount & vbCrLf & _
            "Поля Word обновлены, документ сохранён." & vbCrLf & _
+           "Резервная копия: " & backupPath & vbCrLf & _
            "Итоговый список: лист '" & TABLE_REPORT_SHEET & "'.", _
            vbInformation, "Нумерация таблиц"
     GoTo CleanExit
