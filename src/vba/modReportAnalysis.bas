@@ -14,6 +14,9 @@ Public Sub ScanWordReportMentions()
     Dim wdApp As Object
     Dim wdDoc As Object
     Dim ws As Worksheet
+    Dim backupWs As Worksheet
+    Dim backupName As String
+    Dim originalSheetExisted As Boolean
     Dim para As Object
     Dim rng As Object
     Dim rx As Object
@@ -50,7 +53,21 @@ Public Sub ScanWordReportMentions()
     Set wdApp = CreateObject("Word.Application")
     wdApp.Visible = False
     Set wdDoc = wdApp.Documents.Open(reportPath, False, True, False)
-    Set ws = GetOrCreateReportSheet(RESULT_SHEET)
+
+    ' Preserve previous results until the new scan completes successfully.
+    On Error Resume Next
+    Set ws = ThisWorkbook.Worksheets(RESULT_SHEET)
+    On Error GoTo Failed
+    originalSheetExisted = Not (ws Is Nothing)
+    If originalSheetExisted Then
+        ws.Copy After:=ws
+        Set backupWs = ActiveSheet
+        backupName = "tmpMentions_" & Format$(Now, "hhmmss")
+        backupWs.Name = backupName
+        Set ws = ThisWorkbook.Worksheets(RESULT_SHEET)
+    Else
+        Set ws = GetOrCreateReportSheet(RESULT_SHEET)
+    End If
     ws.Cells.Clear
     ws.Cells(1, 1).Value = "№"
     ws.Cells(1, 2).Value = "Упоминание"
@@ -102,6 +119,12 @@ Public Sub ScanWordReportMentions()
     Next para
 
     FormatReportResults ws, rowOut - 1
+    If Not backupWs Is Nothing Then
+        Application.DisplayAlerts = False
+        backupWs.Delete
+        Set backupWs = Nothing
+        Application.DisplayAlerts = oldAlerts
+    End If
     MsgBox "Проверка завершена. Найдено упоминаний: " & (rowOut - FIRST_RESULT_ROW) & _
            vbCrLf & "Результат записан на лист '" & RESULT_SHEET & "'.", vbInformation, "Проверка Word-отчёта"
     GoTo CleanExit
@@ -112,8 +135,24 @@ Failed:
     On Error Resume Next
     If Not wdDoc Is Nothing Then wdDoc.Close False
     If Not wdApp Is Nothing Then wdApp.Quit
+
+    ' Roll back the output sheet so a failed/cancelled scan cannot leave partial results.
+    If Not backupWs Is Nothing Then
+        Application.DisplayAlerts = False
+        ws.Delete
+        backupWs.Name = RESULT_SHEET
+        Set ws = backupWs
+        Set backupWs = Nothing
+    ElseIf Not ws Is Nothing And Not originalSheetExisted Then
+        Application.DisplayAlerts = False
+        ws.Delete
+        Set ws = Nothing
+    End If
+    Application.DisplayAlerts = oldAlerts
     On Error GoTo 0
-    MsgBox IIf(cancelled, "Проверка отменена.", "Ошибка при анализе Word-отчёта: " & errText), vbExclamation
+    MsgBox IIf(cancelled, "Проверка отменена. Предыдущие результаты сохранены.", _
+        "Ошибка при анализе Word-отчёта: " & errText & vbCrLf & _
+        "Предыдущие результаты восстановлены, если лист существовал."), vbExclamation
     GoTo RestoreExcel
 
 CleanExit:
@@ -144,6 +183,8 @@ Public Sub CountPagesForRegister()
     Dim errText As String
     Dim completed As Long
     Dim failed As Long
+    Dim oldPageValues As Variant
+    Dim pageSnapshotTaken As Boolean
 
     oldScreen = Application.ScreenUpdating
     oldEvents = Application.EnableEvents
@@ -159,6 +200,10 @@ Public Sub CountPagesForRegister()
         MsgBox "На активном листе нет строк перечня.", vbInformation
         GoTo CleanExit
     End If
+
+    ' Keep the original page-count column so Ctrl+Break or a fatal error can roll back.
+    oldPageValues = ws.Range("J3:J" & lastRow).Formula
+    pageSnapshotTaken = True
 
     For r = 3 To lastRow
         DoEvents
@@ -231,6 +276,7 @@ Failed:
     errText = Err.Description
     If Err.Number = 18 Then errText = "Операция отменена пользователем (Ctrl+Break)."
     On Error Resume Next
+    If pageSnapshotTaken Then ws.Range("J3:J" & lastRow).Formula = oldPageValues
     If Not wdDoc Is Nothing Then wdDoc.Close False
     If Not wdApp Is Nothing Then wdApp.Quit
     If Not wb Is Nothing Then wb.Close False
