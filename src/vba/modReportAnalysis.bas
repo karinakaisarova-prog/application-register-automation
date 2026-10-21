@@ -62,7 +62,7 @@ Public Sub ScanWordReportMentions()
     If originalSheetExisted Then
         ws.Copy After:=ws
         Set backupWs = ActiveSheet
-        backupName = "tmpMentions_" & Format$(Now, "yymmdd_hhnnss")
+        backupName = "tmpMentions_" & Format$(Now, "yymmdd_hhnnss") & "_" & CStr(ThisWorkbook.Worksheets.Count)
         backupWs.Name = backupName
         Set ws = ThisWorkbook.Worksheets(RESULT_SHEET)
     Else
@@ -150,9 +150,9 @@ Failed:
     End If
     Application.DisplayAlerts = oldAlerts
     On Error GoTo 0
-    MsgBox IIf(cancelled, "Проверка отменена. Предыдущие результаты сохранены.", _
+    MsgBox IIf(cancelled, "Проверка отменена. Выполнена попытка сохранить прежние результаты.", _
         "Ошибка при анализе Word-отчёта: " & errText & vbCrLf & _
-        "Предыдущие результаты восстановлены, если лист существовал."), vbExclamation
+        "Выполнена попытка восстановления прежних результатов. Проверьте листы книги."), vbExclamation
     GoTo RestoreExcel
 
 CleanExit:
