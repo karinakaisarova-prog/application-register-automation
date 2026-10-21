@@ -170,7 +170,12 @@ Private Function IsSupportedExtension(ByVal ext As String) As Boolean
 End Function
 
 Private Function IsMainReport(ByVal fileName As String) As Boolean
-    IsMainReport = (LCase$(Left$(Trim$(fileName), 6)) = "отчет_")
+    Dim normalized As String
+    normalized = LCase$(Trim$(fileName))
+    IsMainReport = (Left$(normalized, 6) = "отчет_" Or _
+                    Left$(normalized, 6) = "отчёт_" Or _
+                    Left$(normalized, 6) = "отчет " Or _
+                    Left$(normalized, 6) = "отчёт ")
 End Function
 
 Private Function ParseFileName(ByVal fileName As String) As Object
