@@ -164,7 +164,7 @@ Public Sub CountPagesForRegister()
         DoEvents
         filePath = GetRegisterPath(ws.Cells(r, 7))
         If Len(filePath) > 0 And Len(Dir$(filePath)) > 0 Then
-            ext = LCase$(Mid$(filePath, InStrRev(filePath, ".") + 1))
+            ext = GetFileExtensionFromPath(filePath)
             pages = Empty
             On Error GoTo FileFailed
             Select Case ext
@@ -247,6 +247,21 @@ CleanExit:
     Application.StatusBar = False
     Application.EnableCancelKey = xlInterrupt
 End Sub
+
+Private Function GetFileExtensionFromPath(ByVal filePath As String) As String
+    Dim fileName As String
+    Dim separatorPos As Long
+    Dim dotPos As Long
+
+    separatorPos = InStrRev(filePath, "\\")
+    fileName = Mid$(filePath, separatorPos + 1)
+    dotPos = InStrRev(fileName, ".")
+    If dotPos > 0 And dotPos < Len(fileName) Then
+        GetFileExtensionFromPath = LCase$(Mid$(fileName, dotPos + 1))
+    Else
+        GetFileExtensionFromPath = ""
+    End If
+End Function
 
 Private Function CountPdfPagesWithAcrobat(ByVal pdfPath As String) As Variant
     Dim pdfDoc As Object
