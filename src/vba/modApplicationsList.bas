@@ -85,6 +85,7 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
 
     Set ws = GetOrCreateSheet(sheetName)
     BuildOutputSheet ws, mFiles, mSections
+    CheckDuplicateApplicationNumbers ws
     ApplyLookups ws
     ws.Columns(TEMP_SORT_COL).Hidden = True
     ws.Activate
@@ -390,6 +391,62 @@ Private Sub BuildOutputSheet(ByVal ws As Worksheet, ByVal files As Collection, B
     End If
 
     ApplyTableFormatting ws, r - 1
+End Sub
+
+Private Sub CheckDuplicateApplicationNumbers(ByVal ws As Worksheet)
+    Dim lastRow As Long
+    Dim r As Long
+    Dim objectName As String
+    Dim appNumber As String
+    Dim key As String
+    Dim counts As Object
+    Dim duplicateCount As Long
+
+    lastRow = ws.Cells(ws.Rows.Count, 2).End(xlUp).Row
+    If lastRow < FIRST_DATA_ROW Then Exit Sub
+
+    Set counts = CreateObject("Scripting.Dictionary")
+    counts.CompareMode = vbTextCompare
+
+    ' Count each application number separately within each object.
+    For r = FIRST_DATA_ROW To lastRow
+        objectName = Trim$(CStr(ws.Cells(r, 2).Value))
+        appNumber = Trim$(CStr(ws.Cells(r, 3).Value))
+        If Len(objectName) > 0 And Len(appNumber) > 0 Then
+            key = UCase$(objectName) & "|" & UCase$(appNumber)
+            If counts.Exists(key) Then
+                counts(key) = CLng(counts(key)) + 1
+            Else
+                counts.Add key, 1
+            End If
+        End If
+    Next r
+
+    ' Highlight every row participating in a duplicate, and record it in the run log.
+    For r = FIRST_DATA_ROW To lastRow
+        objectName = Trim$(CStr(ws.Cells(r, 2).Value))
+        appNumber = Trim$(CStr(ws.Cells(r, 3).Value))
+        If Len(objectName) > 0 And Len(appNumber) > 0 Then
+            key = UCase$(objectName) & "|" & UCase$(appNumber)
+            If counts.Exists(key) Then
+                If CLng(counts(key)) > 1 Then
+                    ws.Cells(r, 2).Interior.Color = RGB(255, 199, 206)
+                    ws.Cells(r, 3).Interior.Color = RGB(255, 199, 206)
+                    ws.Cells(r, 2).Font.Color = RGB(156, 0, 6)
+                    ws.Cells(r, 3).Font.Color = RGB(156, 0, 6)
+                    LogLine "Повтор номера приложения № " & appNumber & _
+                            " у объекта '" & objectName & "' (строка " & r & ")."
+                    duplicateCount = duplicateCount + 1
+                End If
+            End If
+        End If
+    Next r
+
+    If duplicateCount = 0 Then
+        LogLine "Повторов номеров приложений внутри объектов не обнаружено."
+    Else
+        LogLine "Проверка нумерации: отмечено строк с повторяющимися номерами: " & duplicateCount & "."
+    End If
 End Sub
 
 Private Sub ApplyLookups(ByVal ws As Worksheet)
