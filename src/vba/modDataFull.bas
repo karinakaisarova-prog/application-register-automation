@@ -78,7 +78,7 @@ Public Sub BuildDataFull()
     If outputWasExisting Then
         outputWs.Copy After:=ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count)
         Set backupWs = ActiveSheet
-        backupWs.Name = "df_bak_" & Format$(Now, "yymmddhhnnss")
+        backupWs.Name = GetUniqueDataFullBackupName()
     Else
         Set outputWs = GetOrCreateDataFullSheet()
     End If
@@ -173,4 +173,29 @@ Private Function GetOrCreateDataFullSheet() As Worksheet
         Set GetOrCreateDataFullSheet = ThisWorkbook.Worksheets.Add(After:=ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count))
         GetOrCreateDataFullSheet.Name = OUTPUT_SHEET
     End If
+End Function
+
+Private Function GetUniqueDataFullBackupName() As String
+    Dim baseName As String
+    Dim candidate As String
+    Dim suffix As Long
+    Dim ws As Worksheet
+    Dim exists As Boolean
+
+    baseName = "df_bak_" & Format$(Now, "yymmddhhnnss")
+    candidate = baseName
+    suffix = 1
+    Do
+        exists = False
+        For Each ws In ThisWorkbook.Worksheets
+            If StrComp(ws.Name, candidate, vbTextCompare) = 0 Then
+                exists = True
+                Exit For
+            End If
+        Next ws
+        If Not exists Then Exit Do
+        candidate = baseName & "_" & CStr(suffix)
+        suffix = suffix + 1
+    Loop
+    GetUniqueDataFullBackupName = candidate
 End Function
