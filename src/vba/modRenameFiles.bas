@@ -18,7 +18,7 @@ Public Sub RenameFilesFromRegister()
     Dim oldPath As String, newPath As String, newName As String, ext As String
     Dim objectName As String, appNo As String, titleText As String
     Dim plan As Collection, rec As Object, seen As Object, item As Variant
-    Dim preview As String, problems As String, failure As String
+    Dim preview As String, problems As String, failure As String, batchId As String
     Dim renamed As Long, failed As Long
     Dim oldScreen As Boolean, oldEvents As Boolean, oldAlerts As Boolean
 
@@ -31,6 +31,7 @@ Public Sub RenameFilesFromRegister()
     Application.EnableEvents = False
 
     Set ws = ActiveSheet
+    batchId = Format$(Now, "yyyymmdd_hhnnss")
     lastRow = ws.Cells(ws.Rows.Count, COL_LINK).End(xlUp).Row
     If lastRow < FIRST_DATA_ROW Then
         MsgBox "На активном листе нет строк для переименования.", vbInformation
@@ -103,6 +104,7 @@ ContinueRow:
     If Len(CStr(logWs.Cells(1, 1).Value)) = 0 Then
         logWs.Range("A1:G1").Value = Array("Дата", "Лист перечня", "Строка перечня", "Старый путь", "Новое имя", "Новый путь", "Статус/ошибка")
     End If
+    If Len(CStr(logWs.Cells(1, 8).Value)) = 0 Then logWs.Cells(1, 8).Value = "ID пакета"
     logRow = logWs.Cells(logWs.Rows.Count, 1).End(xlUp).Row + 1
 
     For Each item In plan
@@ -121,9 +123,11 @@ ContinueRow:
                 Address:=CStr(item("NewPath")), TextToDisplay:="Открыть файл"
             On Error GoTo Failed
             logWs.Cells(logRow, 7).Value = "Переименован"
+            logWs.Cells(logRow, 8).Value = batchId
             renamed = renamed + 1
         Else
             logWs.Cells(logRow, 7).Value = "Ошибка: " & failure
+            logWs.Cells(logRow, 8).Value = batchId
             failed = failed + 1
         End If
         logRow = logRow + 1
@@ -149,7 +153,7 @@ Public Sub RollbackLastRenameBatch()
     Dim logWs As Worksheet, registerWs As Worksheet
     Dim lastRow As Long, r As Long, registerRow As Long
     Dim oldPath As String, newPath As String, statusText As String
-    Dim restored As Long, skipped As Long, errText As String, sheetName As String
+    Dim restored As Long, skipped As Long, errText As String, sheetName As String, batchId As String
 
     On Error GoTo Failed
     Set logWs = ThisWorkbook.Worksheets(LOG_SHEET)
@@ -158,13 +162,24 @@ Public Sub RollbackLastRenameBatch()
         MsgBox "Журнал переименования пуст.", vbInformation
         Exit Sub
     End If
-    If MsgBox("Отменить все успешные переименования из журнала в обратном порядке? " & _
+    batchId = ""
+    For r = lastRow To 2 Step -1
+        If Len(Trim$(CStr(logWs.Cells(r, 8).Value))) > 0 Then
+            batchId = Trim$(CStr(logWs.Cells(r, 8).Value))
+            Exit For
+        End If
+    Next r
+    If Len(batchId) = 0 Then
+        MsgBox "В журнале нет ID пакета. Автоматический откат старых записей не выполняется, чтобы случайно не отменить несколько запусков сразу.", vbExclamation
+        Exit Sub
+    End If
+    If MsgBox("Отменить последнее переименование (пакет " & batchId & ")? " & _
               "Если исходное имя уже занято, файл будет пропущен.", _
               vbYesNo + vbQuestion + vbDefaultButton2, "Откат переименования") <> vbYes Then Exit Sub
 
     For r = lastRow To 2 Step -1
         statusText = CStr(logWs.Cells(r, 7).Value)
-        If statusText = "Переименован" Then
+        If statusText = "Переименован" And Trim$(CStr(logWs.Cells(r, 8).Value)) = batchId Then
             oldPath = CStr(logWs.Cells(r, 4).Value)
             newPath = CStr(logWs.Cells(r, 6).Value)
             If Len(Dir$(newPath)) = 0 Or Len(Dir$(oldPath)) > 0 Then
@@ -255,5 +270,5 @@ Private Sub FormatRenameLog(ByVal ws As Worksheet)
     End With
     ws.Rows(1).Font.Bold = True
     ws.Rows(1).Interior.Color = RGB(198, 224, 180)
-    ws.Columns("A:G").AutoFit
+    ws.Columns("A:H").AutoFit
 End Sub
