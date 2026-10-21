@@ -62,7 +62,7 @@ Public Sub ScanWordReportMentions()
     If originalSheetExisted Then
         ws.Copy After:=ws
         Set backupWs = ActiveSheet
-        backupName = "tmpMentions_" & Format$(Now, "hhmmss")
+        backupName = "tmpMentions_" & Format$(Now, "yymmdd_hhnnss")
         backupWs.Name = backupName
         Set ws = ThisWorkbook.Worksheets(RESULT_SHEET)
     Else
