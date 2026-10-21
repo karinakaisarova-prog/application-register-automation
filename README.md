@@ -84,3 +84,8 @@
 ## Что код делает сейчас
 
 Подробное описание фактического поведения модулей и известных ограничений: [docs/current-state.md](docs/current-state.md). Это описание исходного кода, а не подтверждение успешной компиляции или выполнения в Excel.
+
+
+### Word backup and recovery
+
+The table-numbering and bullet-list macros now create a timestamped backup beside the selected Word document after the user confirms changes. The backup is retained, its path is reported, and the error handler attempts to restore the original file from it. This behavior is not yet runtime-tested; see `tests/test-checklist.md` before relying on it for production documents.
