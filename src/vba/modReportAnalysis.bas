@@ -253,7 +253,7 @@ Private Function GetFileExtensionFromPath(ByVal filePath As String) As String
     Dim separatorPos As Long
     Dim dotPos As Long
 
-    separatorPos = InStrRev(filePath, "\\")
+    separatorPos = InStrRev(filePath, "\")
     fileName = Mid$(filePath, separatorPos + 1)
     dotPos = InStrRev(fileName, ".")
     If dotPos > 0 And dotPos < Len(fileName) Then
