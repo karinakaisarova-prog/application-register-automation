@@ -292,10 +292,20 @@ Private Function GetRegisterPath(ByVal c As Range) As String
     On Error Resume Next
     If c.Hyperlinks.Count > 0 Then
         GetRegisterPath = CStr(c.Hyperlinks(1).Address)
+        If Len(GetRegisterPath) = 0 Then GetRegisterPath = CStr(c.Hyperlinks(1).SubAddress)
     Else
         GetRegisterPath = CStr(c.Value)
     End If
     On Error GoTo 0
+    GetRegisterPath = NormalizeReportPath(GetRegisterPath)
+End Function
+
+Private Function NormalizeReportPath(ByVal value As String) As String
+    value = Trim$(value)
+    If LCase$(Left$(value, 8)) = "file:///" Then value = Mid$(value, 9)
+    value = Replace(value, "%20", " ")
+    value = Replace(value, "/", "\")
+    NormalizeReportPath = value
 End Function
 
 Private Function GetOrCreateReportSheet(ByVal sheetName As String) As Worksheet
