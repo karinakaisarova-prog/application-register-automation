@@ -297,7 +297,7 @@ Private Sub SaveExistingSections(ByVal ws As Worksheet, ByVal target As Object)
     For r = FIRST_DATA_ROW To lastRow
         filePath = GetCellLinkPath(ws.Cells(r, 7))
         sectionValue = CStr(ws.Cells(r, 8).Value)
-        If Len(filePath) > 0 And Len(sectionValue) > 0 Then target(filePath) = sectionValue
+        If Len(filePath) > 0 And Len(sectionValue) > 0 Then target(NormalizeFilePath(filePath)) = sectionValue
     Next r
 Done:
 End Sub
@@ -306,10 +306,19 @@ Private Function GetCellLinkPath(ByVal c As Range) As String
     On Error Resume Next
     If c.Hyperlinks.Count > 0 Then
         GetCellLinkPath = CStr(c.Hyperlinks(1).Address)
+        If Len(GetCellLinkPath) = 0 Then GetCellLinkPath = CStr(c.Hyperlinks(1).SubAddress)
     Else
         GetCellLinkPath = CStr(c.Value)
     End If
     On Error GoTo 0
+End Function
+
+Private Function NormalizeFilePath(ByVal value As String) As String
+    value = Trim$(value)
+    If LCase$(Left$(value, 8)) = "file:///" Then value = Mid$(value, 9)
+    value = Replace(value, "%20", " ")
+    value = Replace(value, "/", "\")
+    NormalizeFilePath = LCase$(value)
 End Function
 
 Private Sub BuildOutputSheet(ByVal ws As Worksheet, ByVal files As Collection, ByVal sections As Object)
@@ -354,7 +363,7 @@ Private Sub BuildOutputSheet(ByVal ws As Worksheet, ByVal files As Collection, B
         ws.Hyperlinks.Add Anchor:=ws.Cells(r, 7), Address:=CStr(rec("Path")), TextToDisplay:="Открыть файл"
 
         sectionValue = ""
-        If sections.Exists(CStr(rec("Path"))) Then sectionValue = CStr(sections(CStr(rec("Path"))))
+        If sections.Exists(NormalizeFilePath(CStr(rec("Path")))) Then sectionValue = CStr(sections(NormalizeFilePath(CStr(rec("Path")))))
         ws.Cells(r, 8).Value = sectionValue
 
         If IsSpecialDepartmentFile(CStr(rec("FileName")), CStr(rec("Title"))) Then
@@ -409,12 +418,23 @@ Private Sub ApplyLookups(ByVal ws As Worksheet)
 End Sub
 
 Private Function IsSpecialDepartmentFile(ByVal fileNameOrNumber As String, ByVal titleText As String) As Boolean
-    Dim s As String
-    s = LCase$(fileNameOrNumber & " " & titleText)
-    IsSpecialDepartmentFile = (InStr(1, s, "отчет_2 кв 2026", vbTextCompare) > 0 Or _
-                               InStr(1, s, "отчет 2 кв 2026", vbTextCompare) > 0 Or _
-                               InStr(1, s, "2 кв 2026", vbTextCompare) > 0 Or _
-                               InStr(1, s, "реестр рисков", vbTextCompare) > 0)
+    Dim fso As Object
+    Dim baseName As String
+    Dim normalizedFile As String
+    Dim normalizedTitle As String
+
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    baseName = fso.GetBaseName(fileNameOrNumber)
+    normalizedFile = LCase$(Trim$(Replace(Replace(baseName, "_", " "), "ё", "е")))
+    normalizedTitle = LCase$(Trim$(Replace(Replace(titleText, "_", " "), "ё", "е")))
+
+    ' Only the two explicitly named files receive a dash; avoid matching any title
+    ' that merely contains the quarter/year phrase.
+    IsSpecialDepartmentFile = (normalizedFile = "отчет 2 кв 2026" Or _
+                               normalizedFile = "отчёт 2 кв 2026" Or _
+                               normalizedFile = "реестр рисков" Or _
+                               normalizedTitle = "2 кв 2026" Or _
+                               normalizedTitle = "реестр рисков")
 End Function
 
 Private Sub ApplyTableFormatting(ByVal ws As Worksheet, ByVal lastRow As Long)
