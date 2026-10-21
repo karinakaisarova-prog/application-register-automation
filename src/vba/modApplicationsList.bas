@@ -58,9 +58,15 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
         Next rootItem
     End With
 
+    sheetName = SafeSheetName(GetFolderName(CStr(roots(1))))
+    If LCase$(sheetName) = LCase$(DATA_SHEET_NAME) Then sheetName = "Перечень приложений"
+
     Set mSections = CreateObject("Scripting.Dictionary")
     mSections.CompareMode = vbTextCompare
-    SaveExistingSections ActiveSheet, mSections
+    On Error Resume Next
+    Set ws = ThisWorkbook.Worksheets(sheetName)
+    On Error GoTo Failed
+    If Not ws Is Nothing Then SaveExistingSections ws, mSections
 
     Set mFiles = New Collection
     For Each rootItem In roots
@@ -74,7 +80,6 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
         GoTo CleanExit
     End If
 
-    sheetName = SafeSheetName(GetFolderName(CStr(roots(1))))
     Set ws = GetOrCreateSheet(sheetName)
     BuildOutputSheet ws, mFiles, mSections
     ApplyLookups ws
