@@ -89,3 +89,8 @@
 ### Word backup and recovery
 
 The table-numbering and bullet-list macros now create a timestamped backup beside the selected Word document after the user confirms changes. The backup is retained, its path is reported, and the error handler attempts to restore the original file from it. This behavior is not yet runtime-tested; see `tests/test-checklist.md` before relying on it for production documents.
+
+
+### Rename interruption handling
+
+The rename macro now tracks successful operations during the current run and attempts to reverse them if the run is interrupted or raises an error. This is best-effort recovery, not a transactional guarantee; validate the log and actual file paths after testing.
