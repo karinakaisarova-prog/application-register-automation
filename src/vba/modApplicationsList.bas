@@ -155,6 +155,10 @@ Private Sub CollectFiles(ByVal rootPath As String, ByVal currentPath As String, 
     Exit Sub
 
 FolderError:
+    If Err.Number = 18 Then
+        ' Do not swallow Ctrl+Break; let the top-level handler restore Excel state.
+        Err.Raise 18
+    End If
     LogLine "Не удалось прочитать папку: " & currentPath & " (" & Err.Description & ")"
     Err.Clear
 End Sub
