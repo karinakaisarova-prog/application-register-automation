@@ -101,3 +101,8 @@ The rename macro now tracks successful operations during the current run and att
 `ScanWordReportMentions` now makes a temporary copy of the existing results sheet before replacing its contents. On a handled error or Ctrl+Break it attempts to restore the previous sheet; if there was no previous results sheet, it attempts to remove the partial one. `CountPagesForRegister` snapshots the existing values/formulas in column J and attempts to restore them after a fatal error or Ctrl+Break. Individual unreadable files are still marked in their own rows.
 
 These are best-effort recovery paths and have **not** been tested in a running Excel/Word environment. Workbook structure protection or an unexpected Excel/COM failure can prevent restoration. See the added cases in `tests/test-checklist.md`.
+
+
+### Журнал при прерывании пакетного переименования
+
+Если макрос прерывается и автоматический возврат файла к исходному имени проходит успешно, строка журнала получает статус «Автоматически отменён после прерывания». Если вернуть файл не удалось, журнал фиксирует «Ошибка автоматического отката» и текст причины. Это помогает сопоставить журнал с фактическим состоянием файлов; после любой ошибки всё равно требуется ручная проверка. Изменение добавлено в коммите `96b9928`, тесты — в `25a3a29`.
