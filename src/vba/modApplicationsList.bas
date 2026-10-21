@@ -135,7 +135,7 @@ Private Sub CollectFiles(ByVal rootPath As String, ByVal currentPath As String, 
             If Not mSeenPaths.Exists(CStr(fileItem.Path)) Then
                 mSeenPaths.Add CStr(fileItem.Path), True
                 Set info = ParseFileName(CStr(fileItem.Name))
-                objectName = GetObjectName(rootPath, currentPath)
+                objectName = GetObjectName(rootPath, currentPath, CStr(fileItem.Name))
                 Dim rec As Object
                 Set rec = CreateObject("Scripting.Dictionary")
                 rec("Path") = CStr(fileItem.Path)
@@ -229,27 +229,58 @@ Private Function ParseFileName(ByVal fileName As String) As Object
     Set ParseFileName = result
 End Function
 
-Private Function GetObjectName(ByVal rootPath As String, ByVal currentPath As String) As String
+Private Function GetObjectName(ByVal rootPath As String, ByVal currentPath As String, ByVal fileName As String) As String
     Dim fso As Object
-    Dim relativePath As String
-    Dim parts() As String
+    Dim folderPath As String
+    Dim folderName As String
+    Dim candidate As String
+    Dim objectNames As Variant
+    Dim i As Long
 
+    ' Keep the six approved object labels in one place.
+    objectNames = Array("КЗТ", "СМТ", "АМТ", "Саратов", "НТУ", "КТ")
     Set fso = CreateObject("Scripting.FileSystemObject")
     rootPath = RemoveTrailingSlash(rootPath)
-    currentPath = RemoveTrailingSlash(currentPath)
+    folderPath = RemoveTrailingSlash(currentPath)
 
-    If StrComp(rootPath, currentPath, vbTextCompare) = 0 Then
-        GetObjectName = GetFolderName(rootPath)
-        Exit Function
-    End If
+    ' Check folder names first, starting with the deepest folder and moving
+    ' upward through the selected root. Do not infer an object from a random folder name.
+    Do
+        folderName = GetFolderName(folderPath)
+        candidate = FindObjectInText(folderName, objectNames)
+        If Len(candidate) > 0 Then
+            GetObjectName = candidate
+            Exit Function
+        End If
 
-    relativePath = Mid$(currentPath, Len(rootPath) + 2)
-    parts = Split(relativePath, "\")
-    If UBound(parts) >= 0 And Len(parts(0)) > 0 Then
-        GetObjectName = parts(0)
-    Else
-        GetObjectName = GetFolderName(currentPath)
-    End If
+        If StrComp(folderPath, rootPath, vbTextCompare) = 0 Then Exit Do
+        If Len(folderPath) <= Len(rootPath) Then Exit Do
+        folderPath = fso.GetParentFolderName(folderPath)
+        If Len(folderPath) = 0 Then Exit Do
+    Loop
+
+    ' Only if no approved object was found in any folder, check the file name.
+    GetObjectName = FindObjectInText(fileName, objectNames)
+End Function
+
+Private Function FindObjectInText(ByVal sourceText As String, ByVal objectNames As Variant) As String
+    Dim rx As Object
+    Dim i As Long
+    Dim objectName As String
+
+    Set rx = CreateObject("VBScript.RegExp")
+    rx.Global = False
+    rx.IgnoreCase = True
+
+    For i = LBound(objectNames) To UBound(objectNames)
+        objectName = CStr(objectNames(i))
+        ' Match a complete code/name, not a substring inside another word.
+        rx.Pattern = "(^|[^А-Яа-яA-Za-z0-9])" & objectName & "([^А-Яа-яA-Za-z0-9]|$)"
+        If rx.Test(sourceText) Then
+            FindObjectInText = objectName
+            Exit Function
+        End If
+    Next i
 End Function
 
 Private Sub SaveExistingSections(ByVal ws As Worksheet, ByVal target As Object)
