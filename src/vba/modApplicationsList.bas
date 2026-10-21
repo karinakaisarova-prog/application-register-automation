@@ -191,16 +191,17 @@ Private Function ParseFileName(ByVal fileName As String) As Object
     Set rx = CreateObject("VBScript.RegExp")
     rx.Global = False
     rx.IgnoreCase = True
-    rx.Pattern = "приложени[ея]\s*№?\s*([0-9]+[А-ЯA-Z]?)"
+    rx.Pattern = "приложени[ея]\s*(№|номер)?\s*([0-9]+[А-ЯA-Z]?)"
     If rx.Test(baseName) Then
         Set matches = rx.Execute(baseName)
-        appNumber = matches(0).SubMatches(0)
+        appNumber = matches(0).SubMatches(1)
         p = InStr(1, baseName, matches(0).Value, vbTextCompare)
-        titleText = Trim$(Mid$(baseName, p + Len(matches(0).Value)))
+        titleText = Mid$(baseName, p + Len(matches(0).Value))
         titleText = Replace(titleText, "_", " ")
         titleText = Trim$(titleText)
-        If Left$(titleText, 1) = "_" Then titleText = Mid$(titleText, 2)
-        If Right$(titleText, 1) = "_" Then titleText = Left$(titleText, Len(titleText) - 1)
+        Do While Len(titleText) > 0 And (Left$(titleText, 1) = "-" Or Left$(titleText, 1) = "—")
+            titleText = Trim$(Mid$(titleText, 2))
+        Loop
     ElseIf LCase$(Left$(baseName, 6)) = "отчет_" Then
         titleText = Mid$(baseName, 7)
         appNumber = ""
