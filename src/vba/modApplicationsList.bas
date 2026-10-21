@@ -70,6 +70,8 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
     If Not ws Is Nothing Then SaveExistingSections ws, mSections
 
     Set mFiles = New Collection
+    Set mSeenPaths = CreateObject("Scripting.Dictionary")
+    mSeenPaths.CompareMode = vbTextCompare
     For Each rootItem In roots
         mRootPath = CStr(rootItem)
         LogLine "Поиск файлов: " & mRootPath
