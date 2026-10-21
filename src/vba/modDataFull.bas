@@ -28,10 +28,14 @@ Public Sub BuildDataFull()
     Dim oldScreen As Boolean
     Dim oldEvents As Boolean
     Dim oldAlerts As Boolean
+    Dim oldStatusBar As Variant
+    Dim oldCancelKey As XlEnableCancelKey
 
     oldScreen = Application.ScreenUpdating
     oldEvents = Application.EnableEvents
     oldAlerts = Application.DisplayAlerts
+    oldStatusBar = Application.StatusBar
+    oldCancelKey = Application.EnableCancelKey
     On Error GoTo Failed
     Application.EnableCancelKey = xlErrorHandler
     Application.ScreenUpdating = False
@@ -157,8 +161,8 @@ CleanExit:
     Application.ScreenUpdating = oldScreen
     Application.EnableEvents = oldEvents
     Application.DisplayAlerts = oldAlerts
-    Application.StatusBar = False
-    Application.EnableCancelKey = xlInterrupt
+    Application.StatusBar = oldStatusBar
+    Application.EnableCancelKey = oldCancelKey
 End Sub
 
 Private Function GetOrCreateDataFullSheet() As Worksheet
