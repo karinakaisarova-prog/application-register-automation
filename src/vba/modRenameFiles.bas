@@ -202,20 +202,34 @@ End Sub
 
 Public Sub RollbackLastRenameBatch()
     Dim logWs As Worksheet, registerWs As Worksheet
-    Dim lastRow As Long, r As Long, registerRow As Long
+    Dim lastRow As Long, r As Long, registerRow As Long, logRow As Long
     Dim oldPath As String, newPath As String, statusText As String
     Dim restored As Long, skipped As Long, errText As String, sheetName As String, batchId As String
+    Dim oldScreen As Boolean, oldEvents As Boolean, oldAlerts As Boolean
+    Dim oldStatusBar As Variant, oldCancelKey As XlEnableCancelKey
+    Dim reversedItems As Collection, item As Object, doneItem As Object
+    Dim failure As String, recoveryError As String, itemPath As Variant
 
+    oldScreen = Application.ScreenUpdating
+    oldEvents = Application.EnableEvents
+    oldAlerts = Application.DisplayAlerts
+    oldStatusBar = Application.StatusBar
+    oldCancelKey = Application.EnableCancelKey
+    Set reversedItems = New Collection
     On Error GoTo Failed
+    Application.EnableCancelKey = xlErrorHandler
+    Application.ScreenUpdating = False
+    Application.EnableEvents = False
+
     Set logWs = ThisWorkbook.Worksheets(LOG_SHEET)
     lastRow = logWs.Cells(logWs.Rows.Count, 1).End(xlUp).Row
     If lastRow < 2 Then
         MsgBox "Журнал переименования пуст.", vbInformation
-        Exit Sub
+        GoTo CleanExit
     End If
+
     batchId = ""
     ' Find the newest batch that still has successful, not-yet-rolled-back renames.
-    ' This allows rolling back an earlier batch after the newest batch was already undone.
     For r = lastRow To 2 Step -1
         If Trim$(CStr(logWs.Cells(r, 7).Value)) = "Переименован" And _
            Len(Trim$(CStr(logWs.Cells(r, 8).Value))) > 0 Then
@@ -225,13 +239,15 @@ Public Sub RollbackLastRenameBatch()
     Next r
     If Len(batchId) = 0 Then
         MsgBox "В журнале нет переименованных файлов, доступных для отката. Старые записи без ID пакета автоматически не откатываются.", vbExclamation
-        Exit Sub
+        GoTo CleanExit
     End If
     If MsgBox("Отменить последнее переименование (пакет " & batchId & ")? " & _
-              "Если исходное имя уже занято, файл будет пропущен.", _
-              vbYesNo + vbQuestion + vbDefaultButton2, "Откат переименования") <> vbYes Then Exit Sub
+              "Если исходное имя уже занято, файл будет пропущен. При прерывании макрос попытается вернуть уже откатанные файлы к новым именам.", _
+              vbYesNo + vbQuestion + vbDefaultButton2, "Откат переименования") <> vbYes Then GoTo CleanExit
 
     For r = lastRow To 2 Step -1
+        DoEvents
+        Application.StatusBar = "Откат переименования: запись " & r & " из " & lastRow
         statusText = CStr(logWs.Cells(r, 7).Value)
         If statusText = "Переименован" And Trim$(CStr(logWs.Cells(r, 8).Value)) = batchId Then
             oldPath = CStr(logWs.Cells(r, 4).Value)
@@ -242,17 +258,26 @@ Public Sub RollbackLastRenameBatch()
             Else
                 errText = TryRenameFile(newPath, oldPath)
                 If Len(errText) = 0 Then
+                    ' Track immediately after the filesystem change so interruption recovery can find it.
+                    Set doneItem = CreateObject("Scripting.Dictionary")
+                    doneItem("LogRow") = r
+                    doneItem("OldPath") = oldPath
+                    doneItem("NewPath") = newPath
+                    doneItem("SheetName") = CStr(logWs.Cells(r, 2).Value)
+                    doneItem("RegisterRow") = CLng(Val(logWs.Cells(r, 3).Value))
+                    reversedItems.Add doneItem
+
                     logWs.Cells(r, 7).Value = "Откатан"
-                    sheetName = CStr(logWs.Cells(r, 2).Value)
-                    registerRow = CLng(logWs.Cells(r, 3).Value)
+                    sheetName = CStr(doneItem("SheetName"))
+                    registerRow = CLng(doneItem("RegisterRow"))
+                    Set registerWs = Nothing
                     On Error Resume Next
                     Set registerWs = ThisWorkbook.Worksheets(sheetName)
-                    If Not registerWs Is Nothing Then
+                    If Not registerWs Is Nothing And registerRow > 0 Then
                         registerWs.Cells(registerRow, COL_LINK).Hyperlinks.Delete
                         registerWs.Hyperlinks.Add Anchor:=registerWs.Cells(registerRow, COL_LINK), _
                             Address:=oldPath, TextToDisplay:="Открыть файл"
                     End If
-                    Set registerWs = Nothing
                     On Error GoTo Failed
                     restored = restored + 1
                 Else
@@ -262,10 +287,47 @@ Public Sub RollbackLastRenameBatch()
             End If
         End If
     Next r
+    FormatRenameLog logWs
     MsgBox "Откат завершён. Восстановлено: " & restored & "; пропущено: " & skipped, vbInformation
-    Exit Sub
+    GoTo CleanExit
+
 Failed:
-    MsgBox "Не удалось выполнить откат: " & Err.Description, vbExclamation
+    failure = Err.Description
+    If Err.Number = 18 Then failure = "Операция отменена пользователем (Ctrl+Break)."
+    ' Best-effort recovery: restore files already renamed back to their post-rename paths.
+    On Error Resume Next
+    Application.EnableCancelKey = xlDisabled
+    For Each item In reversedItems
+        recoveryError = TryRenameFile(CStr(item("OldPath")), CStr(item("NewPath")))
+        logRow = CLng(item("LogRow"))
+        If Len(recoveryError) = 0 Then
+            logWs.Cells(logRow, 7).Value = "Переименован"
+            Set registerWs = Nothing
+            Set registerWs = ThisWorkbook.Worksheets(CStr(item("SheetName")))
+            If Not registerWs Is Nothing And CLng(item("RegisterRow")) > 0 Then
+                registerWs.Cells(CLng(item("RegisterRow")), COL_LINK).Hyperlinks.Delete
+                registerWs.Hyperlinks.Add Anchor:=registerWs.Cells(CLng(item("RegisterRow")), COL_LINK), _
+                    Address:=CStr(item("NewPath")), TextToDisplay:="Открыть файл"
+            End If
+        Else
+            logWs.Cells(logRow, 7).Value = "Ошибка восстановления после прерывания: " & recoveryError
+            failure = failure & vbCrLf & "Не удалось вернуть файл к новому имени: " & CStr(item("OldPath")) & _
+                      " (" & recoveryError & ")"
+        End If
+    Next item
+    On Error GoTo 0
+    MsgBox "Откат прерван. Макрос попытался вернуть уже обработанные файлы к состоянию до отката." & vbCrLf & _
+           failure & vbCrLf & "Проверьте журнал переименования и фактические имена файлов.", vbExclamation
+    GoTo CleanExit
+
+CleanExit:
+    On Error Resume Next
+    Application.ScreenUpdating = oldScreen
+    Application.EnableEvents = oldEvents
+    Application.DisplayAlerts = oldAlerts
+    Application.StatusBar = oldStatusBar
+    Application.EnableCancelKey = oldCancelKey
+    On Error GoTo 0
 End Sub
 
 Private Function TryRenameFile(ByVal oldPath As String, ByVal newPath As String) As String
