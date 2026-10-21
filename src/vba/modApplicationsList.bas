@@ -34,11 +34,19 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
     Dim oldCalculation As XlCalculation
     Dim cancelOrError As Boolean
     Dim errText As String
+    Dim backupWs As Worksheet
+    Dim targetWasExisting As Boolean
+    Dim originalSheetName As String
+    Dim backupSheetName As String
+    Dim oldStatusBar As Variant
+    Dim oldCancelKey As XlEnableCancelKey
 
     oldScreenUpdating = Application.ScreenUpdating
     oldEnableEvents = Application.EnableEvents
     oldDisplayAlerts = Application.DisplayAlerts
     oldCalculation = Application.Calculation
+    oldStatusBar = Application.StatusBar
+    oldCancelKey = Application.EnableCancelKey
 
     On Error GoTo Failed
     Application.EnableCancelKey = xlErrorHandler
@@ -67,7 +75,17 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
     On Error Resume Next
     Set ws = ThisWorkbook.Worksheets(sheetName)
     On Error GoTo Failed
-    If Not ws Is Nothing Then SaveExistingSections ws, mSections
+    targetWasExisting = Not ws Is Nothing
+    originalSheetName = sheetName
+    If targetWasExisting Then
+        SaveExistingSections ws, mSections
+        ' Keep a worksheet-level recovery copy before any destructive rebuild.
+        backupSheetName = GetUniqueBackupSheetName()
+        ws.Copy After:=ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count)
+        Set backupWs = ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count)
+        backupWs.Name = backupSheetName
+        LogLine "Создана временная резервная копия листа: " & originalSheetName
+    End If
 
     Set mFiles = New Collection
     Set mSeenPaths = CreateObject("Scripting.Dictionary")
@@ -83,12 +101,18 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
         GoTo CleanExit
     End If
 
-    Set ws = GetOrCreateSheet(sheetName)
+    If ws Is Nothing Then Set ws = GetOrCreateSheet(sheetName)
     BuildOutputSheet ws, mFiles, mSections
     CheckDuplicateApplicationNumbers ws
     ApplyLookups ws
     ws.Columns(TEMP_SORT_COL).Hidden = True
     ws.Activate
+    If Not backupWs Is Nothing Then
+        Application.DisplayAlerts = False
+        backupWs.Delete
+        Set backupWs = Nothing
+        LogLine "Временная резервная копия удалена после успешного формирования."
+    End If
     Application.StatusBar = False
     MsgBox "Перечень сформирован. Найдено файлов: " & mFiles.Count & vbCrLf & vbCrLf & mLogText, _
            vbInformation, "Перечень приложений"
@@ -103,19 +127,50 @@ Failed:
         LogLine "Ошибка " & Err.Number & ": " & errText
     End If
     On Error Resume Next
+    If Not backupWs Is Nothing Then
+        Application.DisplayAlerts = False
+        Set ws = Nothing
+        Set ws = ThisWorkbook.Worksheets(originalSheetName)
+        If Not ws Is Nothing Then ws.Delete
+        backupWs.Name = originalSheetName
+        Set ws = backupWs
+        Set backupWs = Nothing
+        LogLine "Исходный лист восстановлен из резервной копии."
+    ElseIf Not targetWasExisting Then
+        Set ws = Nothing
+        Set ws = ThisWorkbook.Worksheets(sheetName)
+        If Not ws Is Nothing Then ws.Delete
+        LogLine "Новый неполный лист удалён."
+    End If
     Application.StatusBar = False
     MsgBox IIf(cancelOrError, "Операция отменена.", "Не удалось завершить формирование перечня: " & errText) & _
            vbCrLf & vbCrLf & mLogText, vbExclamation, "Перечень приложений"
 
 CleanExit:
     On Error Resume Next
+    If Not backupWs Is Nothing Then
+        ' Last-resort cleanup only when the main operation succeeded; error recovery keeps the backup as the restored sheet.
+        If Err.Number = 0 Then backupWs.Delete
+    End If
     Application.ScreenUpdating = oldScreenUpdating
     Application.EnableEvents = oldEnableEvents
     Application.DisplayAlerts = oldDisplayAlerts
     Application.Calculation = oldCalculation
-    Application.StatusBar = False
-    Application.EnableCancelKey = xlInterrupt
+    Application.StatusBar = oldStatusBar
+    Application.EnableCancelKey = oldCancelKey
 End Sub
+
+Private Function GetUniqueBackupSheetName() As String
+    Dim candidate As String
+    Dim suffix As Long
+    candidate = "_bak_register"
+    suffix = 1
+    Do While WorksheetExists(candidate)
+        candidate = "_bak_register_" & CStr(suffix)
+        suffix = suffix + 1
+    Loop
+    GetUniqueBackupSheetName = candidate
+End Function
 
 Private Sub CollectFiles(ByVal rootPath As String, ByVal currentPath As String, ByVal depth As Long)
     Dim fso As Object
