@@ -214,7 +214,7 @@ NextRow:
 FileFailed:
     If Err.Number = 18 Then
         ' Ctrl+Break must reach the top-level handler so Excel state is restored.
-        Err.Raise 18
+        GoTo Failed
     End If
     failed = failed + 1
     ws.Cells(r, 10).Value = "Ошибка чтения"
