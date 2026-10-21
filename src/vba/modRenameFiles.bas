@@ -2,9 +2,8 @@ Attribute VB_Name = "modRenameFiles"
 Option Explicit
 
 ' Safe file renaming from the existing register sheet.
-' Expected columns: B=Object, C=Application number, D=Title, G=File hyperlink.
-' The macro previews every planned rename and asks for confirmation before changing files.
-' Existing destination files are never overwritten.
+' Columns: B=Object, C=Application number, D=Title, G=File hyperlink.
+' Preview + explicit confirmation; never overwrites an existing destination.
 
 Private Const FIRST_DATA_ROW As Long = 3
 Private Const COL_OBJECT As Long = 2
@@ -14,32 +13,14 @@ Private Const COL_LINK As Long = 7
 Private Const LOG_SHEET As String = "Журнал переименования"
 
 Public Sub RenameFilesFromRegister()
-    Dim ws As Worksheet
-    Dim logWs As Worksheet
-    Dim lastRow As Long
-    Dim r As Long
-    Dim oldPath As String
-    Dim newPath As String
-    Dim oldName As String
-    Dim newName As String
-    Dim ext As String
-    Dim objectName As String
-    Dim appNo As String
-    Dim titleText As String
-    Dim plan As Collection
-    Dim rec As Object
-    Dim seen As Object
-    Dim preview As String
-    Dim problems As String
-    Dim item As Variant
-    Dim i As Long
-    Dim logRow As Long
-    Dim renamed As Long
-    Dim failed As Long
-    Dim oldScreen As Boolean
-    Dim oldEvents As Boolean
-    Dim oldAlerts As Boolean
-    Dim errText As String
+    Dim ws As Worksheet, logWs As Worksheet
+    Dim lastRow As Long, r As Long, logRow As Long
+    Dim oldPath As String, newPath As String, newName As String, ext As String
+    Dim objectName As String, appNo As String, titleText As String
+    Dim plan As Collection, rec As Object, seen As Object, item As Variant
+    Dim preview As String, problems As String, failure As String
+    Dim renamed As Long, failed As Long
+    Dim oldScreen As Boolean, oldEvents As Boolean, oldAlerts As Boolean
 
     oldScreen = Application.ScreenUpdating
     oldEvents = Application.EnableEvents
@@ -48,6 +29,7 @@ Public Sub RenameFilesFromRegister()
     Application.EnableCancelKey = xlErrorHandler
     Application.ScreenUpdating = False
     Application.EnableEvents = False
+
     Set ws = ActiveSheet
     lastRow = ws.Cells(ws.Rows.Count, COL_LINK).End(xlUp).Row
     If lastRow < FIRST_DATA_ROW Then
@@ -80,14 +62,13 @@ Public Sub RenameFilesFromRegister()
         newName = CleanFileName(objectName & "_Приложение № " & appNo & "_" & titleText) & ext
         newPath = Left$(oldPath, InStrRev(oldPath, Application.PathSeparator)) & newName
         If StrComp(oldPath, newPath, vbTextCompare) = 0 Then GoTo ContinueRow
-
         If seen.Exists(newPath) Then
-            problems = problems & "Строка " & r & ": одинаковое целевое имя уже запланировано — " & newName & vbCrLf
+            problems = problems & "Строка " & r & ": дублируется целевое имя — " & newName & vbCrLf
             GoTo ContinueRow
         End If
         seen(newPath) = True
         If Len(Dir$(newPath)) > 0 Then
-            problems = problems & "Строка " & r & ": файл с целевым именем уже существует — " & newPath & vbCrLf
+            problems = problems & "Строка " & r & ": целевой файл уже существует — " & newPath & vbCrLf
             GoTo ContinueRow
         End If
 
@@ -102,45 +83,51 @@ ContinueRow:
     Next r
 
     If plan.Count = 0 Then
-        MsgBox "Нет безопасных переименований для выполнения." & IIf(Len(problems) > 0, vbCrLf & vbCrLf & problems, ""), vbInformation
+        MsgBox "Нет безопасных переименований для выполнения." & IIf(Len(problems) > 0, vbCrLf & problems, ""), vbInformation
         GoTo CleanExit
     End If
 
     preview = "Будут переименованы файлы: " & plan.Count & vbCrLf & vbCrLf
     For Each item In plan
         preview = preview & CStr(item("OldName")) & vbCrLf & "  → " & CStr(item("NewName")) & vbCrLf & vbCrLf
-        If Len(preview) > 6000 Then
-            preview = preview & "... (остальные строки есть в журнале после подтверждения)" & vbCrLf
+        If Len(preview) > 5500 Then
+            preview = preview & "... Остальные файлы будут записаны в журнал." & vbCrLf
             Exit For
         End If
     Next item
     If Len(problems) > 0 Then preview = preview & "Пропущенные строки:" & vbCrLf & problems
     If MsgBox(preview & vbCrLf & "Продолжить? Исходные файлы будут переименованы.", _
-              vbYesNo + vbQuestion + vbDefaultButton2, "Подтверждение переименования") <> vbYes Then
-        GoTo CleanExit
-    End If
+              vbYesNo + vbQuestion + vbDefaultButton2, "Подтверждение переименования") <> vbYes Then GoTo CleanExit
 
     Set logWs = GetOrCreateRenameLog(LOG_SHEET)
     If Len(CStr(logWs.Cells(1, 1).Value)) = 0 Then
-        logWs.Range("A1:G1").Value = Array("Дата", "Строка перечня", "Старый путь", "Новое имя", "Новый путь", "Статус", "Ошибка")
+        logWs.Range("A1:G1").Value = Array("Дата", "Лист перечня", "Строка перечня", "Старый путь", "Новое имя", "Новый путь", "Статус/ошибка")
     End If
     logRow = logWs.Cells(logWs.Rows.Count, 1).End(xlUp).Row + 1
+
     For Each item In plan
         DoEvents
-        On Error GoTo RenameFailed
-        Name CStr(item("OldPath")) As CStr(item("NewPath"))
-        ws.Hyperlinks.Add Anchor:=ws.Cells(CLng(item("Row")), COL_LINK), _
-            Address:=CStr(item("NewPath")), TextToDisplay:="Открыть файл"
+        failure = TryRenameFile(CStr(item("OldPath")), CStr(item("NewPath")))
         logWs.Cells(logRow, 1).Value = Now
-        logWs.Cells(logRow, 2).Value = item("Row")
-        logWs.Cells(logRow, 3).Value = item("OldPath")
-        logWs.Cells(logRow, 4).Value = item("NewName")
-        logWs.Cells(logRow, 5).Value = item("NewPath")
-        logWs.Cells(logRow, 6).Value = "Переименован"
-        logWs.Cells(logRow, 7).Value = ""
+        logWs.Cells(logRow, 2).Value = ws.Name
+        logWs.Cells(logRow, 3).Value = item("Row")
+        logWs.Cells(logRow, 4).Value = item("OldPath")
+        logWs.Cells(logRow, 5).Value = item("NewName")
+        logWs.Cells(logRow, 6).Value = item("NewPath")
+        If Len(failure) = 0 Then
+            On Error Resume Next
+            ws.Cells(CLng(item("Row")), COL_LINK).Hyperlinks.Delete
+            ws.Hyperlinks.Add Anchor:=ws.Cells(CLng(item("Row")), COL_LINK), _
+                Address:=CStr(item("NewPath")), TextToDisplay:="Открыть файл"
+            On Error GoTo Failed
+            logWs.Cells(logRow, 7).Value = "Переименован"
+            renamed = renamed + 1
+        Else
+            logWs.Cells(logRow, 7).Value = "Ошибка: " & failure
+            failed = failed + 1
+        End If
         logRow = logRow + 1
-        renamed = renamed + 1
-        On Error GoTo Failed
+        Application.StatusBar = "Переименование: " & (renamed + failed) & " из " & plan.Count
     Next item
 
     FormatRenameLog logWs
@@ -148,26 +135,8 @@ ContinueRow:
            IIf(Len(problems) > 0, vbCrLf & vbCrLf & "Пропуски:" & vbCrLf & problems, ""), vbInformation
     GoTo CleanExit
 
-RenameFailed:
-    errText = Err.Description
-    logWs.Cells(logRow, 1).Value = Now
-    logWs.Cells(logRow, 2).Value = item("Row")
-    logWs.Cells(logRow, 3).Value = item("OldPath")
-    logWs.Cells(logRow, 4).Value = item("NewName")
-    logWs.Cells(logRow, 5).Value = item("NewPath")
-    logWs.Cells(logRow, 6).Value = "Ошибка"
-    logWs.Cells(logRow, 7).Value = errText
-    logRow = logRow + 1
-    failed = failed + 1
-    Err.Clear
-    On Error GoTo Failed
-    Resume NextItem
-NextItem:
-    On Error GoTo Failed
-    Resume Next
 Failed:
-    errText = Err.Description
-    MsgBox "Операция переименования прервана: " & errText, vbExclamation
+    MsgBox "Операция переименования прервана: " & Err.Description, vbExclamation
 CleanExit:
     Application.ScreenUpdating = oldScreen
     Application.EnableEvents = oldEvents
@@ -177,15 +146,10 @@ CleanExit:
 End Sub
 
 Public Sub RollbackLastRenameBatch()
-    Dim logWs As Worksheet
-    Dim lastRow As Long
-    Dim r As Long
-    Dim oldPath As String
-    Dim newPath As String
-    Dim statusText As String
-    Dim restored As Long
-    Dim skipped As Long
-    Dim errText As String
+    Dim logWs As Worksheet, registerWs As Worksheet
+    Dim lastRow As Long, r As Long, registerRow As Long
+    Dim oldPath As String, newPath As String, statusText As String
+    Dim restored As Long, skipped As Long, errText As String, sheetName As String
 
     On Error GoTo Failed
     Set logWs = ThisWorkbook.Worksheets(LOG_SHEET)
@@ -194,42 +158,63 @@ Public Sub RollbackLastRenameBatch()
         MsgBox "Журнал переименования пуст.", vbInformation
         Exit Sub
     End If
-    If MsgBox("Попытаться отменить все успешные переименования из журнала в обратном порядке? " & _
+    If MsgBox("Отменить все успешные переименования из журнала в обратном порядке? " & _
               "Если исходное имя уже занято, файл будет пропущен.", _
               vbYesNo + vbQuestion + vbDefaultButton2, "Откат переименования") <> vbYes Then Exit Sub
 
     For r = lastRow To 2 Step -1
-        statusText = CStr(logWs.Cells(r, 6).Value)
+        statusText = CStr(logWs.Cells(r, 7).Value)
         If statusText = "Переименован" Then
-            oldPath = CStr(logWs.Cells(r, 3).Value)
-            newPath = CStr(logWs.Cells(r, 5).Value)
+            oldPath = CStr(logWs.Cells(r, 4).Value)
+            newPath = CStr(logWs.Cells(r, 6).Value)
             If Len(Dir$(newPath)) = 0 Or Len(Dir$(oldPath)) > 0 Then
-                logWs.Cells(r, 6).Value = "Откат пропущен"
-                logWs.Cells(r, 7).Value = "Новый файл отсутствует или исходное имя уже занято."
+                logWs.Cells(r, 7).Value = "Откат пропущен: новый файл отсутствует или исходное имя занято"
                 skipped = skipped + 1
             Else
-                On Error Resume Next
-                Name newPath As oldPath
-                If Err.Number = 0 Then
-                    logWs.Cells(r, 6).Value = "Откатан"
-                    logWs.Cells(r, 7).Value = ""
+                errText = TryRenameFile(newPath, oldPath)
+                If Len(errText) = 0 Then
+                    logWs.Cells(r, 7).Value = "Откатан"
+                    sheetName = CStr(logWs.Cells(r, 2).Value)
+                    registerRow = CLng(logWs.Cells(r, 3).Value)
+                    On Error Resume Next
+                    Set registerWs = ThisWorkbook.Worksheets(sheetName)
+                    If Not registerWs Is Nothing Then
+                        registerWs.Cells(registerRow, COL_LINK).Hyperlinks.Delete
+                        registerWs.Hyperlinks.Add Anchor:=registerWs.Cells(registerRow, COL_LINK), _
+                            Address:=oldPath, TextToDisplay:="Открыть файл"
+                    End If
+                    Set registerWs = Nothing
+                    On Error GoTo Failed
                     restored = restored + 1
                 Else
-                    logWs.Cells(r, 6).Value = "Ошибка отката"
-                    logWs.Cells(r, 7).Value = Err.Description
+                    logWs.Cells(r, 7).Value = "Ошибка отката: " & errText
                     skipped = skipped + 1
-                    Err.Clear
                 End If
-                On Error GoTo Failed
             End If
         End If
     Next r
     MsgBox "Откат завершён. Восстановлено: " & restored & "; пропущено: " & skipped, vbInformation
     Exit Sub
 Failed:
-    errText = Err.Description
-    MsgBox "Не удалось выполнить откат: " & errText, vbExclamation
+    MsgBox "Не удалось выполнить откат: " & Err.Description, vbExclamation
 End Sub
+
+Private Function TryRenameFile(ByVal oldPath As String, ByVal newPath As String) As String
+    On Error GoTo RenameError
+    If Len(Dir$(oldPath)) = 0 Then
+        TryRenameFile = "Исходный файл не найден."
+        Exit Function
+    End If
+    If Len(Dir$(newPath)) > 0 Then
+        TryRenameFile = "Целевой файл уже существует."
+        Exit Function
+    End If
+    Name oldPath As newPath
+    Exit Function
+RenameError:
+    TryRenameFile = Err.Description
+    Err.Clear
+End Function
 
 Private Function RegisterFilePath(ByVal c As Range) As String
     On Error Resume Next
@@ -242,8 +227,7 @@ Private Function RegisterFilePath(ByVal c As Range) As String
 End Function
 
 Private Function CleanFileName(ByVal value As String) As String
-    Dim invalidChars As Variant
-    Dim i As Long
+    Dim invalidChars As Variant, i As Long
     invalidChars = Array("\", "/", ":", "*", "?", """", "<", ">", "|")
     For i = LBound(invalidChars) To UBound(invalidChars)
         value = Replace(value, CStr(invalidChars(i)), "_")
