@@ -31,7 +31,6 @@ Public Sub RenameFilesFromRegister()
     Application.EnableEvents = False
 
     Set ws = ActiveSheet
-    batchId = Format$(Now, "yyyymmdd_hhnnss")
     lastRow = ws.Cells(ws.Rows.Count, COL_LINK).End(xlUp).Row
     If lastRow < FIRST_DATA_ROW Then
         MsgBox "На активном листе нет строк для переименования.", vbInformation
@@ -106,6 +105,7 @@ ContinueRow:
     End If
     If Len(CStr(logWs.Cells(1, 8).Value)) = 0 Then logWs.Cells(1, 8).Value = "ID пакета"
     logRow = logWs.Cells(logWs.Rows.Count, 1).End(xlUp).Row + 1
+    batchId = Format$(Now, "yyyymmdd_hhnnss") & "_" & Format$(logRow, "000000")
 
     For Each item In plan
         DoEvents
@@ -163,14 +163,17 @@ Public Sub RollbackLastRenameBatch()
         Exit Sub
     End If
     batchId = ""
+    ' Find the newest batch that still has successful, not-yet-rolled-back renames.
+    ' This allows rolling back an earlier batch after the newest batch was already undone.
     For r = lastRow To 2 Step -1
-        If Len(Trim$(CStr(logWs.Cells(r, 8).Value))) > 0 Then
+        If Trim$(CStr(logWs.Cells(r, 7).Value)) = "Переименован" And _
+           Len(Trim$(CStr(logWs.Cells(r, 8).Value))) > 0 Then
             batchId = Trim$(CStr(logWs.Cells(r, 8).Value))
             Exit For
         End If
     Next r
     If Len(batchId) = 0 Then
-        MsgBox "В журнале нет ID пакета. Автоматический откат старых записей не выполняется, чтобы случайно не отменить несколько запусков сразу.", vbExclamation
+        MsgBox "В журнале нет переименованных файлов, доступных для отката. Старые записи без ID пакета автоматически не откатываются.", vbExclamation
         Exit Sub
     End If
     If MsgBox("Отменить последнее переименование (пакет " & batchId & ")? " & _
