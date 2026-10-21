@@ -17,6 +17,7 @@ Public Sub BuildDataFull()
     Dim key As String
     Dim pairs As Object
     Dim k As Variant
+    Dim pairValues As Variant
     Dim outRow As Long
 
     On Error GoTo Failed
@@ -48,8 +49,9 @@ Public Sub BuildDataFull()
     targetWs.Range("A1:B1").Value = Array("Раздел", "Ответственное лицо")
     outRow = 2
     For Each k In pairs.Keys
-        targetWs.Cells(outRow, 1).Value = pairs(k)(0)
-        targetWs.Cells(outRow, 2).Value = pairs(k)(1)
+        pairValues = pairs(k)
+        targetWs.Cells(outRow, 1).Value = pairValues(0)
+        targetWs.Cells(outRow, 2).Value = pairValues(1)
         outRow = outRow + 1
     Next k
 
