@@ -249,29 +249,22 @@ Private Sub LogTableBackup(ByVal ws As Worksheet, ByVal message As String)
 End Sub
 
 Private Function HasTableSequenceField(ByVal wdDoc As Object, ByVal tableStart As Long) As Boolean
-    Dim p As Long
-    Dim probe As Object
+    Dim paraIndex As Long
+    Dim checkedParagraphs As Long
     Dim para As Object
     Dim fld As Object
     Dim codeText As String
-    Dim stepsBack As Long
+    Dim paraText As String
 
-    ' Search the few paragraphs immediately before the table, stopping at the first
-    ' non-empty paragraph. A matching Word SEQ field is the criterion for a numbered caption.
-    For stepsBack = 1 To 4
-        p = tableStart - stepsBack
-        If p < 0 Then Exit For
-        On Error Resume Next
-        Set probe = wdDoc.Range(0, tableStart - stepsBack + 1)
-        Set para = probe.Paragraphs.Last.Range
-        If Err.Number <> 0 Or para Is Nothing Then
-            Err.Clear
-            On Error GoTo 0
-            Exit For
-        End If
-        On Error GoTo 0
-
-        If para.Fields.Count > 0 Then
+    ' Search up to four actual paragraphs before the table (not four characters).
+    ' Stop at the first non-empty paragraph so an unrelated earlier SEQ field
+    ' cannot make this table appear to have a caption.
+    For paraIndex = wdDoc.Paragraphs.Count To 1 Step -1
+        Set para = wdDoc.Paragraphs(paraIndex).Range
+        If para.Start >= tableStart Then
+            ' Paragraph is at or inside the table; skip it.
+        ElseIf para.End <= tableStart Then
+            checkedParagraphs = checkedParagraphs + 1
             For Each fld In para.Fields
                 codeText = UCase$(Trim$(CStr(fld.Code.Text)))
                 If InStr(1, codeText, "SEQ", vbTextCompare) > 0 And _
@@ -280,10 +273,14 @@ Private Function HasTableSequenceField(ByVal wdDoc As Object, ByVal tableStart A
                     Exit Function
                 End If
             Next fld
-        End If
 
-        If Len(Trim$(Replace(Replace(CStr(para.Text), vbCr, ""), Chr$(7), ""))) > 0 Then Exit For
-    Next stepsBack
+            paraText = CStr(para.Text)
+            paraText = Replace(paraText, vbCr, "")
+            paraText = Replace(paraText, Chr$(7), "")
+            If Len(Trim$(paraText)) > 0 Then Exit For
+            If checkedParagraphs >= 4 Then Exit For
+        End If
+    Next paraIndex
 End Function
 
 Private Function GetPreviousCaptionText(ByVal wdDoc As Object, ByVal tableStart As Long) As String
