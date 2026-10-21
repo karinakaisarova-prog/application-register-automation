@@ -34,6 +34,7 @@ Public Sub CheckAndNumberWordTables()
     Dim answer As VbMsgBoxResult
     Dim backupPath As String
     Dim changesStarted As Boolean
+    Dim fsoRestore As Object
 
     oldScreen = Application.ScreenUpdating
     oldEvents = Application.EnableEvents
@@ -183,7 +184,8 @@ Failed:
     If Not wdApp Is Nothing Then wdApp.Quit
     If changesStarted And Len(backupPath) > 0 Then
         Err.Clear
-        FileCopy backupPath, reportPath
+        Set fsoRestore = CreateObject("Scripting.FileSystemObject")
+        fsoRestore.CopyFile backupPath, reportPath, True
         If Err.Number = 0 Then
             LogTableBackup ws, "Исходный файл восстановлен из копии: " & backupPath
         Else
