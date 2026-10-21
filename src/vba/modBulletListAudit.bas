@@ -30,10 +30,14 @@ Public Sub CheckAndFixWordBulletLists()
     Dim backupPath As String
     Dim changesStarted As Boolean
     Dim fsoRestore As Object
+    Dim oldStatusBar As Variant
+    Dim oldCancelKey As XlEnableCancelKey
 
     oldScreen = Application.ScreenUpdating
     oldEvents = Application.EnableEvents
     oldAlerts = Application.DisplayAlerts
+    oldStatusBar = Application.StatusBar
+    oldCancelKey = Application.EnableCancelKey
     On Error GoTo Failed
     Application.EnableCancelKey = xlErrorHandler
     Application.ScreenUpdating = False
@@ -240,8 +244,8 @@ CleanExit:
     Application.ScreenUpdating = oldScreen
     Application.EnableEvents = oldEvents
     Application.DisplayAlerts = oldAlerts
-    Application.StatusBar = False
-    Application.EnableCancelKey = xlInterrupt
+    Application.StatusBar = oldStatusBar
+    Application.EnableCancelKey = oldCancelKey
 End Sub
 
 Private Function CreateBulletBackupPath(ByVal sourcePath As String) As String
