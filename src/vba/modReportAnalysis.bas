@@ -212,6 +212,10 @@ NextRow:
     GoTo CleanExit
 
 FileFailed:
+    If Err.Number = 18 Then
+        ' Ctrl+Break must reach the top-level handler so Excel state is restored.
+        Err.Raise 18
+    End If
     failed = failed + 1
     ws.Cells(r, 10).Value = "Ошибка чтения"
     On Error Resume Next
@@ -225,6 +229,7 @@ FileFailed:
 
 Failed:
     errText = Err.Description
+    If Err.Number = 18 Then errText = "Операция отменена пользователем (Ctrl+Break)."
     On Error Resume Next
     If Not wdDoc Is Nothing Then wdDoc.Close False
     If Not wdApp Is Nothing Then wdApp.Quit
