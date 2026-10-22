@@ -41,6 +41,8 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
     Dim backupSheetName As String
     Dim oldStatusBar As Variant
     Dim oldCancelKey As XlEnableCancelKey
+    Dim damagedWs As Worksheet
+    Dim recoverySheetName As String
 
     oldScreenUpdating = Application.ScreenUpdating
     oldEnableEvents = Application.EnableEvents
@@ -142,13 +144,47 @@ Failed:
             Set backupWs = Nothing
             LogLine "Формирование не началось; исходный лист оставлен без изменений."
         Else
-            Set ws = Nothing
-            Set ws = ThisWorkbook.Worksheets(originalSheetName)
-            If Not ws Is Nothing Then ws.Delete
-            backupWs.Name = originalSheetName
-            Set ws = backupWs
-            Set backupWs = Nothing
-            LogLine "Исходный лист восстановлен из резервной копии."
+            ' Never delete the damaged worksheet before the backup has taken
+            ' the original name successfully. If a rename fails, retain the
+            ' backup and leave the remaining worksheet(s) available for recovery.
+            Set damagedWs = Nothing
+            Set damagedWs = ThisWorkbook.Worksheets(originalSheetName)
+            If damagedWs Is Nothing Then
+                Err.Clear
+                backupWs.Name = originalSheetName
+                If Err.Number = 0 Then
+                    Set ws = backupWs
+                    Set backupWs = Nothing
+                    LogLine "Исходный лист восстановлен из резервной копии."
+                Else
+                    LogLine "Не удалось восстановить исходное имя листа. Резервная копия сохранена: " & backupWs.Name
+                End If
+            Else
+                recoverySheetName = GetUniqueRecoverySheetName()
+                Err.Clear
+                damagedWs.Name = recoverySheetName
+                If Err.Number = 0 Then
+                    Err.Clear
+                    backupWs.Name = originalSheetName
+                    If Err.Number = 0 Then
+                        Set ws = backupWs
+                        Set backupWs = Nothing
+                        Err.Clear
+                        damagedWs.Delete
+                        If Err.Number = 0 Then
+                            LogLine "Исходный лист восстановлен из резервной копии."
+                        Else
+                            LogLine "Лист восстановлен. Повреждённый лист сохранён под именем: " & recoverySheetName
+                        End If
+                    Else
+                        Err.Clear
+                        damagedWs.Name = originalSheetName
+                        LogLine "Не удалось переименовать резервную копию в исходное имя. Резервная копия сохранена: " & backupWs.Name
+                    End If
+                Else
+                    LogLine "Не удалось безопасно переименовать исходный лист. Резервная копия сохранена: " & backupWs.Name
+                End If
+            End If
         End If
     ElseIf Not targetWasExisting Then
         Set ws = Nothing
@@ -174,6 +210,18 @@ CleanExit:
     Application.StatusBar = oldStatusBar
     Application.EnableCancelKey = oldCancelKey
 End Sub
+
+Private Function GetUniqueRecoverySheetName() As String
+    Dim candidate As String
+    Dim suffix As Long
+    candidate = "_failed_register"
+    suffix = 1
+    Do While WorksheetExists(candidate)
+        candidate = "_failed_reg_" & CStr(suffix)
+        suffix = suffix + 1
+    Loop
+    GetUniqueRecoverySheetName = candidate
+End Function
 
 Private Function GetUniqueBackupSheetName() As String
     Dim candidate As String
