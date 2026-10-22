@@ -36,6 +36,7 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
     Dim errText As String
     Dim backupWs As Worksheet
     Dim targetWasExisting As Boolean
+    Dim rebuildStarted As Boolean
     Dim originalSheetName As String
     Dim backupSheetName As String
     Dim oldStatusBar As Variant
@@ -102,6 +103,7 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
     End If
 
     If ws Is Nothing Then Set ws = GetOrCreateSheet(sheetName)
+    rebuildStarted = True
     BuildOutputSheet ws, mFiles, mSections
     CheckDuplicateApplicationNumbers ws
     ApplyLookups ws
@@ -129,13 +131,20 @@ Failed:
     On Error Resume Next
     If Not backupWs Is Nothing Then
         Application.DisplayAlerts = False
-        Set ws = Nothing
-        Set ws = ThisWorkbook.Worksheets(originalSheetName)
-        If Not ws Is Nothing Then ws.Delete
-        backupWs.Name = originalSheetName
-        Set ws = backupWs
-        Set backupWs = Nothing
-        LogLine "Исходный лист восстановлен из резервной копии."
+        If Not rebuildStarted Then
+            ' The original sheet has not been changed; discard only the unused copy.
+            backupWs.Delete
+            Set backupWs = Nothing
+            LogLine "Формирование не началось; исходный лист оставлен без изменений."
+        Else
+            Set ws = Nothing
+            Set ws = ThisWorkbook.Worksheets(originalSheetName)
+            If Not ws Is Nothing Then ws.Delete
+            backupWs.Name = originalSheetName
+            Set ws = backupWs
+            Set backupWs = Nothing
+            LogLine "Исходный лист восстановлен из резервной копии."
+        End If
     ElseIf Not targetWasExisting Then
         Set ws = Nothing
         Set ws = ThisWorkbook.Worksheets(sheetName)
