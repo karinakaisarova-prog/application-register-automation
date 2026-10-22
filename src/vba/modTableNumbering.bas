@@ -245,7 +245,7 @@ Private Sub InsertCustomTableCaption(ByVal wdApp As Object, ByVal wdDoc As Objec
                 prefixRange.Text = ""
             End If
 
-            fld.Code.Text = " SEQ Таблица # ""'Таблица № '0"" "
+            fld.Code.Text = " SEQ Таблица \\# ""'Таблица № '0"" "
             fld.Update
             foundSeq = True
             Exit For
