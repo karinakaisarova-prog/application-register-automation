@@ -257,8 +257,8 @@ CommitFailed:
     On Error GoTo Failed
 
 Failed:
-    cancelled = (Err.Number = 18)
-    errText = Err.Description
+    If Err.Number = 18 Then cancelled = True
+    If Len(errText) = 0 Then errText = Err.Description
     On Error Resume Next
     If Not wdDoc Is Nothing Then wdDoc.Close False
     If Not wdApp Is Nothing Then wdApp.Quit
