@@ -290,7 +290,10 @@ Private Function GetTypedMarker(ByVal paragraphText As String, ByRef markerOffse
     Loop
     If i > Len(paragraphText) Then Exit Function
     ch = Mid$(paragraphText, i, 1)
-    If ch <> "-" And ch <> ChrW(8211) And ch <> ChrW(8212) And ch <> ChrW(8226) Then Exit Function
+    If ch <> "-" And ch <> ChrW(8211) And ch <> ChrW(8212) And _
+       ch <> ChrW(8226) And ch <> ChrW(9679) And ch <> ChrW(9675) And _
+       ch <> ChrW(9702) And ch <> ChrW(9642) And ch <> ChrW(9643) And _
+       ch <> ChrW(183) And ch <> "*" Then Exit Function
     If i = Len(paragraphText) Then Exit Function
     If Mid$(paragraphText, i + 1, 1) <> " " And Mid$(paragraphText, i + 1, 1) <> vbTab Then Exit Function
 
