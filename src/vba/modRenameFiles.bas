@@ -126,6 +126,8 @@ ContinueRow:
     For Each item In plan
         DoEvents
         failure = TryRenameFile(CStr(item("OldPath")), CStr(item("NewPath")))
+        ' Track the filesystem change immediately, before any worksheet/log operations can fail.
+        If Len(failure) = 0 Then renamedItems.Add item
         logWs.Cells(logRow, 1).Value = Now
         logWs.Cells(logRow, 2).Value = ws.Name
         logWs.Cells(logRow, 3).Value = item("Row")
@@ -133,7 +135,6 @@ ContinueRow:
         logWs.Cells(logRow, 5).Value = item("NewName")
         logWs.Cells(logRow, 6).Value = item("NewPath")
         If Len(failure) = 0 Then
-            renamedItems.Add item
             On Error Resume Next
             ws.Cells(CLng(item("Row")), COL_LINK).Hyperlinks.Delete
             ws.Hyperlinks.Add Anchor:=ws.Cells(CLng(item("Row")), COL_LINK), _
