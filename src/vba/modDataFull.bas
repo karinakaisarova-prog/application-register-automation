@@ -183,7 +183,8 @@ Failed:
     On Error GoTo 0
 
     If wasCancelled Then
-        MsgBox "Формирование data_full отменено пользователем. Предыдущий лист восстановлен, если он существовал.", vbInformation
+        MsgBox "Формирование data_full отменено пользователем. Предыдущий лист восстановлен, если он существовал." & _
+               IIf(InStr(1, failureText, "сохранён", vbTextCompare) > 0 Or InStr(1, failureText, "не удалось", vbTextCompare) > 0, vbCrLf & failureText, ""), vbInformation
     Else
         MsgBox "Не удалось сформировать data_full: " & failureText & _
                IIf(outputWasExisting, vbCrLf & "Предыдущий лист восстановлен, если операция успела изменить его.", ""), vbExclamation
