@@ -149,6 +149,9 @@ Failed:
             If Err.Number = 0 Then
                 Set outputWs = backupWs
                 Set backupWs = Nothing
+            Else
+                Err.Clear
+                failureText = failureText & vbCrLf & "Не удалось вернуть резервной копии исходное имя. Резервная копия сохранена под именем " & backupWs.Name & "."
             End If
         Else
             recoverySheetName = GetUniqueDataFullRecoveryName()
