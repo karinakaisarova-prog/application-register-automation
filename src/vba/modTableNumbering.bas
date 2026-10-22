@@ -136,8 +136,7 @@ Public Sub CheckAndNumberWordTables()
         DoEvents
         Set tbl = wdDoc.Tables(r)
         If Not HasTableSequenceField(wdDoc, tbl.Range.Start) Then
-            tbl.Range.Select
-            wdApp.Selection.InsertCaption "Таблица", "", , WD_CAPTION_POSITION_ABOVE, ""
+            InsertCustomTableCaption wdApp, wdDoc, tbl
             insertedCount = insertedCount + 1
             Application.StatusBar = "Добавление подписей: " & insertedCount & " из " & missingCount
         End If
@@ -215,6 +214,67 @@ CleanExit:
     Application.StatusBar = oldStatusBar
     Application.EnableCancelKey = oldCancelKey
 End Sub
+
+Private Sub InsertCustomTableCaption(ByVal wdApp As Object, ByVal wdDoc As Object, ByVal tbl As Object)
+    Dim captionPara As Object
+    Dim fld As Object
+    Dim prefixRange As Object
+    Dim captionStart As Long
+    Dim captionEnd As Long
+    Dim foundSeq As Boolean
+
+    ' Let Word create a real caption paragraph above the table, then change its
+    ' SEQ field format so the field itself displays "Таблица № 1", etc.
+    tbl.Range.Select
+    wdApp.Selection.InsertCaption "Таблица", "", , WD_CAPTION_POSITION_ABOVE, ""
+
+    captionStart = tbl.Range.Start
+    Set captionPara = GetCaptionParagraphBeforeTable(wdDoc, captionStart)
+    If captionPara Is Nothing Then
+        Err.Raise vbObjectError + 710, "InsertCustomTableCaption", _
+                  "Не удалось найти созданную подпись над таблицей."
+    End If
+
+    For Each fld In captionPara.Fields
+        If InStr(1, CStr(fld.Code.Text), "SEQ", vbTextCompare) > 0 And _
+           InStr(1, CStr(fld.Code.Text), "ТАБЛИЦА", vbTextCompare) > 0 Then
+            ' Remove Word's literal label before the field; the field format
+            ' supplies the complete visible caption.
+            If fld.Range.Start > captionPara.Start Then
+                Set prefixRange = wdDoc.Range(captionPara.Start, fld.Range.Start)
+                prefixRange.Text = ""
+            End If
+
+            fld.Code.Text = " SEQ Таблица # ""'Таблица № '0"" "
+            fld.Update
+            foundSeq = True
+            Exit For
+        End If
+    Next fld
+
+    If Not foundSeq Then
+        Err.Raise vbObjectError + 711, "InsertCustomTableCaption", _
+                  "Word не создал поле SEQ в подписи над таблицей."
+    End If
+End Sub
+
+Private Function GetCaptionParagraphBeforeTable(ByVal wdDoc As Object, ByVal tableStart As Long) As Object
+    Dim paraIndex As Long
+    Dim para As Object
+    Dim txt As String
+
+    For paraIndex = wdDoc.Paragraphs.Count To 1 Step -1
+        Set para = wdDoc.Paragraphs(paraIndex).Range
+        If para.Start < tableStart And para.End <= tableStart Then
+            txt = Replace(CStr(para.Text), vbCr, "")
+            txt = Replace(txt, Chr$(7), "")
+            If Len(Trim$(txt)) > 0 Then
+                Set GetCaptionParagraphBeforeTable = para
+                Exit Function
+            End If
+        End If
+    Next paraIndex
+End Function
 
 Private Function CreateWordBackupPath(ByVal sourcePath As String) As String
     Dim fso As Object
