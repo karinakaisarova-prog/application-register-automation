@@ -15,6 +15,8 @@ Public Sub ScanWordReportMentions()
     Dim wdDoc As Object
     Dim ws As Worksheet
     Dim backupWs As Worksheet
+    Dim damagedWs As Worksheet
+    Dim recoverySheetName As String
     Dim backupName As String
     Dim originalSheetExisted As Boolean
     Dim para As Object
@@ -143,10 +145,43 @@ Failed:
     ' Roll back the output sheet so a failed/cancelled scan cannot leave partial results.
     If Not backupWs Is Nothing Then
         Application.DisplayAlerts = False
-        ws.Delete
-        backupWs.Name = RESULT_SHEET
-        Set ws = backupWs
-        Set backupWs = Nothing
+        Set damagedWs = ws
+        If damagedWs Is Nothing Then
+            Err.Clear
+            backupWs.Name = RESULT_SHEET
+            If Err.Number = 0 Then
+                Set ws = backupWs
+                Set backupWs = Nothing
+            Else
+                Err.Clear
+                LogRestoreIssue "Не удалось вернуть резервной копии исходное имя. Резервная копия сохранена: " & backupWs.Name
+            End If
+        Else
+            recoverySheetName = GetUniqueMentionRecoveryName()
+            Err.Clear
+            damagedWs.Name = recoverySheetName
+            If Err.Number = 0 Then
+                Err.Clear
+                backupWs.Name = RESULT_SHEET
+                If Err.Number = 0 Then
+                    Set ws = backupWs
+                    Set backupWs = Nothing
+                    Err.Clear
+                    damagedWs.Delete
+                    If Err.Number <> 0 Then
+                        Err.Clear
+                        LogRestoreIssue "Прежние результаты восстановлены; неполный лист сохранён под именем " & recoverySheetName
+                    End If
+                Else
+                    Err.Clear
+                    damagedWs.Name = RESULT_SHEET
+                    LogRestoreIssue "Не удалось вернуть резервной копии исходное имя. Резервная копия сохранена: " & backupWs.Name
+                End If
+            Else
+                Err.Clear
+                LogRestoreIssue "Не удалось безопасно переименовать неполный лист. Резервная копия сохранена: " & backupWs.Name
+            End If
+        End If
     ElseIf Not ws Is Nothing And Not originalSheetExisted Then
         Application.DisplayAlerts = False
         ws.Delete
@@ -388,6 +423,30 @@ Private Function NormalizeReportPath(ByVal value As String) As String
     value = Replace(value, "/", "\")
     NormalizeReportPath = value
 End Function
+
+Private Function GetUniqueMentionRecoveryName() As String
+    Dim candidate As String
+    Dim suffix As Long
+    candidate = "_failed_mentions"
+    suffix = 1
+    Do While MentionWorksheetExists(candidate)
+        candidate = "_failed_mnt_" & CStr(suffix)
+        suffix = suffix + 1
+    Loop
+    GetUniqueMentionRecoveryName = candidate
+End Function
+
+Private Function MentionWorksheetExists(ByVal sheetName As String) As Boolean
+    Dim testWs As Worksheet
+    On Error Resume Next
+    Set testWs = ThisWorkbook.Worksheets(sheetName)
+    MentionWorksheetExists = Not testWs Is Nothing
+    On Error GoTo 0
+End Function
+
+Private Sub LogRestoreIssue(ByVal message As String)
+    Debug.Print Format$(Now, "yyyy-mm-dd hh:nn:ss") & "  " & message
+End Sub
 
 Private Function GetOrCreateReportSheet(ByVal sheetName As String) As Worksheet
     On Error Resume Next
