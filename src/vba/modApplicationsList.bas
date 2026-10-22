@@ -260,10 +260,10 @@ Private Function ParseFileName(ByVal fileName As String) As Object
     Set rx = CreateObject("VBScript.RegExp")
     rx.Global = False
     rx.IgnoreCase = True
-    rx.Pattern = "приложени[ея]\s*(№|номер)?\s*([0-9]+[А-ЯA-Z]?)"
+    rx.Pattern = "(приложени[ея]|прил)\.?\s*(№|номер)?\s*([0-9]+[А-ЯA-Z]?)"
     If rx.Test(baseName) Then
         Set matches = rx.Execute(baseName)
-        appNumber = matches(0).SubMatches(1)
+        appNumber = matches(0).SubMatches(2)
         p = InStr(1, baseName, matches(0).Value, vbTextCompare)
         titleText = Mid$(baseName, p + Len(matches(0).Value))
         titleText = Replace(titleText, "_", " ")
