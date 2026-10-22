@@ -32,6 +32,10 @@ Public Sub CheckAndFixWordBulletLists()
     Dim fsoRestore As Object
     Dim oldStatusBar As Variant
     Dim oldCancelKey As XlEnableCancelKey
+    Dim priorWs As Worksheet
+    Dim stageWs As Worksheet
+    Dim stageName As String, priorBackupName As String
+    Dim reportCommitted As Boolean, priorRenamed As Boolean
 
     oldScreen = Application.ScreenUpdating
     oldEvents = Application.EnableEvents
@@ -57,8 +61,14 @@ Public Sub CheckAndFixWordBulletLists()
     wdApp.Visible = False
     Set wdDoc = wdApp.Documents.Open(reportPath, False, False, False)
 
-    Set ws = GetOrCreateBulletReportSheet(BULLET_REPORT_SHEET)
-    ws.Cells.Clear
+    ' Scan into a staging sheet so interruption cannot erase the previous report.
+    On Error Resume Next
+    Set priorWs = ThisWorkbook.Worksheets(BULLET_REPORT_SHEET)
+    On Error GoTo Failed
+    stageName = GetUniqueBulletAuditSheetName("_tmp_bullet_audit")
+    Set stageWs = ThisWorkbook.Worksheets.Add(After:=ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count))
+    stageWs.Name = stageName
+    Set ws = stageWs
     ws.Range("A1:G1").Value = Array("Группа", "Страница", "Текст абзаца", "Найденная маркировка", _
                                     "Предлагаемое действие", "Начальный абзац (служебное)", "Конечный абзац (служебное)")
     rowOut = FIRST_DATA_ROW
@@ -123,6 +133,25 @@ Public Sub CheckAndFixWordBulletLists()
     Loop
 
     FormatBulletReport ws, rowOut - 1
+
+    ' Commit the completed scan by swapping sheet names only after all rows are ready.
+    If Not priorWs Is Nothing Then
+        priorBackupName = GetUniqueBulletAuditSheetName("_bak_bullet_audit")
+        priorWs.Name = priorBackupName
+        priorRenamed = True
+    End If
+    On Error GoTo CommitFailed
+    ws.Name = BULLET_REPORT_SHEET
+    reportCommitted = True
+    Set stageWs = Nothing
+    If priorRenamed Then
+        Application.DisplayAlerts = False
+        priorWs.Delete
+        Set priorWs = Nothing
+        priorRenamed = False
+    End If
+    Application.DisplayAlerts = oldAlerts
+    On Error GoTo Failed
     ws.Activate
 
     If paragraphsFound = 0 Then
@@ -211,12 +240,31 @@ Public Sub CheckAndFixWordBulletLists()
            vbInformation, "Маркированные списки Word"
     GoTo CleanExit
 
+CommitFailed:
+    errText = Err.Description
+    On Error Resume Next
+    If priorRenamed And Not priorWs Is Nothing Then
+        If Not reportCommitted Then priorWs.Name = BULLET_REPORT_SHEET
+    End If
+    If Not stageWs Is Nothing Then
+        If Not reportCommitted Then stageWs.Delete
+    End If
+    Application.DisplayAlerts = oldAlerts
+    Err.Clear
+    On Error GoTo Failed
+
 Failed:
     cancelled = (Err.Number = 18)
     errText = Err.Description
     On Error Resume Next
     If Not wdDoc Is Nothing Then wdDoc.Close False
     If Not wdApp Is Nothing Then wdApp.Quit
+    If Not stageWs Is Nothing Then
+        If Not reportCommitted Then stageWs.Delete
+    End If
+    If priorRenamed And Not priorWs Is Nothing And Not reportCommitted Then
+        priorWs.Name = BULLET_REPORT_SHEET
+    End If
     If changesStarted And Len(backupPath) > 0 Then
         Err.Clear
         Set fsoRestore = CreateObject("Scripting.FileSystemObject")
@@ -247,6 +295,26 @@ CleanExit:
     Application.StatusBar = oldStatusBar
     Application.EnableCancelKey = oldCancelKey
 End Sub
+
+Private Function GetUniqueBulletAuditSheetName(ByVal baseName As String) As String
+    Dim candidate As String
+    Dim suffix As Long
+    candidate = Left$(baseName, 31)
+    suffix = 1
+    Do While BulletAuditSheetExists(candidate)
+        candidate = Left$(baseName, 27) & "_" & CStr(suffix)
+        suffix = suffix + 1
+    Loop
+    GetUniqueBulletAuditSheetName = candidate
+End Function
+
+Private Function BulletAuditSheetExists(ByVal sheetName As String) As Boolean
+    Dim probe As Worksheet
+    On Error Resume Next
+    Set probe = ThisWorkbook.Worksheets(sheetName)
+    BulletAuditSheetExists = Not probe Is Nothing
+    On Error GoTo 0
+End Function
 
 Private Function CreateBulletBackupPath(ByVal sourcePath As String) As String
     Dim fso As Object
