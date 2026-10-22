@@ -218,6 +218,7 @@ Public Sub RollbackLastRenameBatch()
     Dim oldStatusBar As Variant, oldCancelKey As XlEnableCancelKey
     Dim reversedItems As Collection, item As Object, doneItem As Object
     Dim failure As String, recoveryError As String, itemPath As Variant
+    Dim candidateOldPath As String, candidateNewPath As String
 
     oldScreen = Application.ScreenUpdating
     oldEvents = Application.EnableEvents
@@ -238,12 +239,17 @@ Public Sub RollbackLastRenameBatch()
     End If
 
     batchId = ""
-    ' Find the newest batch that still has successful, not-yet-rolled-back renames.
+    ' Select the newest batch based on actual file paths, not journal status alone.
+    ' This lets a partially completed rollback be retried after a previous error.
     For r = lastRow To 2 Step -1
-        If Trim$(CStr(logWs.Cells(r, 7).Value)) = "Переименован" And _
-           Len(Trim$(CStr(logWs.Cells(r, 8).Value))) > 0 Then
-            batchId = Trim$(CStr(logWs.Cells(r, 8).Value))
-            Exit For
+        candidateOldPath = CStr(logWs.Cells(r, 4).Value)
+        candidateNewPath = CStr(logWs.Cells(r, 6).Value)
+        If Len(Trim$(CStr(logWs.Cells(r, 8).Value))) > 0 And _
+           Len(candidateOldPath) > 0 And Len(candidateNewPath) > 0 Then
+            If Len(Dir$(candidateNewPath)) > 0 And Len(Dir$(candidateOldPath)) = 0 Then
+                batchId = Trim$(CStr(logWs.Cells(r, 8).Value))
+                Exit For
+            End If
         End If
     Next r
     If Len(batchId) = 0 Then
@@ -258,11 +264,14 @@ Public Sub RollbackLastRenameBatch()
         DoEvents
         Application.StatusBar = "Откат переименования: запись " & r & " из " & lastRow
         statusText = CStr(logWs.Cells(r, 7).Value)
-        If statusText = "Переименован" And Trim$(CStr(logWs.Cells(r, 8).Value)) = batchId Then
+        If Trim$(CStr(logWs.Cells(r, 8).Value)) = batchId Then
             oldPath = CStr(logWs.Cells(r, 4).Value)
             newPath = CStr(logWs.Cells(r, 6).Value)
-            If Len(Dir$(newPath)) = 0 Or Len(Dir$(oldPath)) > 0 Then
-                logWs.Cells(r, 7).Value = "Откат пропущен: новый файл отсутствует или исходное имя занято"
+            If Len(Dir$(oldPath)) > 0 And Len(Dir$(newPath)) = 0 Then
+                ' Filesystem already reflects a completed rollback; reconcile the journal.
+                logWs.Cells(r, 7).Value = "Откатан"
+            ElseIf Len(Dir$(newPath)) = 0 Or Len(Dir$(oldPath)) > 0 Then
+                logWs.Cells(r, 7).Value = "Откат пропущен: конфликт путей (проверьте оба имени)"
                 skipped = skipped + 1
             Else
                 errText = TryRenameFile(newPath, oldPath)
