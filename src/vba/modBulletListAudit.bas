@@ -247,7 +247,10 @@ CommitFailed:
         If Not reportCommitted Then priorWs.Name = BULLET_REPORT_SHEET
     End If
     If Not stageWs Is Nothing Then
-        If Not reportCommitted Then stageWs.Delete
+        If Not reportCommitted Then
+            Application.DisplayAlerts = False
+            stageWs.Delete
+        End If
     End If
     Application.DisplayAlerts = oldAlerts
     Err.Clear
@@ -260,11 +263,15 @@ Failed:
     If Not wdDoc Is Nothing Then wdDoc.Close False
     If Not wdApp Is Nothing Then wdApp.Quit
     If Not stageWs Is Nothing Then
-        If Not reportCommitted Then stageWs.Delete
+        If Not reportCommitted Then
+            Application.DisplayAlerts = False
+            stageWs.Delete
+        End If
     End If
     If priorRenamed And Not priorWs Is Nothing And Not reportCommitted Then
         priorWs.Name = BULLET_REPORT_SHEET
     End If
+    Application.DisplayAlerts = oldAlerts
     If changesStarted And Len(backupPath) > 0 Then
         Err.Clear
         Set fsoRestore = CreateObject("Scripting.FileSystemObject")
