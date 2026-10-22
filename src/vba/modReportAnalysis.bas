@@ -319,6 +319,9 @@ End Function
 
 Private Function CountPdfPagesWithAcrobat(ByVal pdfPath As String) As Variant
     Dim pdfDoc As Object
+    Dim savedErrNumber As Long
+    Dim savedErrDescription As String
+
     On Error GoTo PdfUnavailable
     Set pdfDoc = CreateObject("AcroExch.PDDoc")
     If pdfDoc.Open(pdfPath) Then
@@ -329,10 +332,19 @@ Private Function CountPdfPagesWithAcrobat(ByVal pdfPath As String) As Variant
     End If
     Set pdfDoc = Nothing
     Exit Function
+
 PdfUnavailable:
+    savedErrNumber = Err.Number
+    savedErrDescription = Err.Description
     On Error Resume Next
     If Not pdfDoc Is Nothing Then pdfDoc.Close
     Set pdfDoc = Nothing
+    On Error GoTo 0
+
+    ' Do not swallow Ctrl+Break: let the caller restore the page-count snapshot.
+    If savedErrNumber = 18 Then
+        Err.Raise savedErrNumber, "CountPdfPagesWithAcrobat", savedErrDescription
+    End If
     CountPdfPagesWithAcrobat = Empty
 End Function
 
