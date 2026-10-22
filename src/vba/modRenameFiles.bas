@@ -64,7 +64,6 @@ Public Sub RenameFilesFromRegister()
                        seenSource(oldPath) & "; повторная обработка пропущена." & vbCrLf
             GoTo ContinueRow
         End If
-        seenSource(oldPath) = r
 
         objectName = Trim$(CStr(ws.Cells(r, COL_OBJECT).Value))
         appNo = Trim$(CStr(ws.Cells(r, COL_APP_NUMBER).Value))
@@ -95,6 +94,7 @@ Public Sub RenameFilesFromRegister()
         rec("OldName") = Mid$(oldPath, InStrRev(oldPath, Application.PathSeparator) + 1)
         rec("NewName") = newName
         plan.Add rec
+        seenSource(oldPath) = r
 ContinueRow:
     Next r
 
