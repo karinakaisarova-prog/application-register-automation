@@ -98,6 +98,11 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
     Next rootItem
 
     If mFiles.Count = 0 Then
+        If Not backupWs Is Nothing Then
+            backupWs.Delete
+            Set backupWs = Nothing
+            LogLine "Файлы не найдены; исходный лист оставлен без изменений, временная копия удалена."
+        End If
         MsgBox "Подходящие файлы не найдены." & vbCrLf & mLogText, vbInformation, "Перечень приложений"
         GoTo CleanExit
     End If
