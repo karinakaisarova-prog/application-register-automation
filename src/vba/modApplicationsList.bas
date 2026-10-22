@@ -517,9 +517,9 @@ Private Sub ApplyLookups(ByVal ws As Worksheet)
     lastRow = ws.Cells(ws.Rows.Count, 4).End(xlUp).Row
     For r = FIRST_DATA_ROW To lastRow
         appName = Trim$(CStr(ws.Cells(r, 4).Value))
-        If IsSpecialDepartmentFile(CStr(ws.Cells(r, 3).Value), appName) Then
-            ws.Cells(r, 5).Value = "—"
-        Else
+        ' The exact source filename was checked while building the row. Preserve
+        ' its special dash here; do not infer special status from a generic title.
+        If Trim$(CStr(ws.Cells(r, 5).Value)) <> "—" Then
             ws.Cells(r, 5).FormulaLocal = "=ЕСЛИОШИБКА(ИНДЕКС(data!$B:$B;ПОИСКПОЗ($D" & r & ";data!$A:$A;0));"""")"
             ws.Cells(r, 6).FormulaLocal = "=ЕСЛИОШИБКА(ИНДЕКС(data!$C:$F;ПОИСКПОЗ($D" & r & ";data!$A:$A;0);ПОИСКПОЗ($B" & r & ";data!$C$1:$F$1;0));"""")"
         End If
@@ -530,20 +530,13 @@ Private Function IsSpecialDepartmentFile(ByVal fileNameOrNumber As String, ByVal
     Dim fso As Object
     Dim baseName As String
     Dim normalizedFile As String
-    Dim normalizedTitle As String
-
     Set fso = CreateObject("Scripting.FileSystemObject")
     baseName = fso.GetBaseName(fileNameOrNumber)
     normalizedFile = LCase$(Trim$(Replace(Replace(baseName, "_", " "), "ё", "е")))
-    normalizedTitle = LCase$(Trim$(Replace(Replace(titleText, "_", " "), "ё", "е")))
 
-    ' Only the two explicitly named files receive a dash; avoid matching any title
-    ' that merely contains the quarter/year phrase.
+    ' Match only exact base filenames, never a generic parsed title.
     IsSpecialDepartmentFile = (normalizedFile = "отчет 2 кв 2026" Or _
-                               normalizedFile = "отчёт 2 кв 2026" Or _
-                               normalizedFile = "реестр рисков" Or _
-                               normalizedTitle = "2 кв 2026" Or _
-                               normalizedTitle = "реестр рисков")
+                               normalizedFile = "реестр рисков")
 End Function
 
 Private Sub ApplyTableFormatting(ByVal ws As Worksheet, ByVal lastRow As Long)
