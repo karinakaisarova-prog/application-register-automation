@@ -32,6 +32,7 @@ Public Sub ScanWordReportMentions()
     Dim oldEvents As Boolean
     Dim oldAlerts As Boolean
     Dim errText As String
+    Dim recoveryNote As String
     Dim cancelled As Boolean
     Dim oldStatusBar As Variant
     Dim oldCancelKey As XlEnableCancelKey
@@ -154,7 +155,7 @@ Failed:
                 Set backupWs = Nothing
             Else
                 Err.Clear
-                LogRestoreIssue "Не удалось вернуть резервной копии исходное имя. Резервная копия сохранена: " & backupWs.Name
+                recoveryNote = "Не удалось вернуть резервной копии исходное имя. Резервная копия сохранена: " & backupWs.Name
             End If
         Else
             recoverySheetName = GetUniqueMentionRecoveryName()
@@ -170,7 +171,7 @@ Failed:
                     damagedWs.Delete
                     If Err.Number <> 0 Then
                         Err.Clear
-                        LogRestoreIssue "Прежние результаты восстановлены; неполный лист сохранён под именем " & recoverySheetName
+                        recoveryNote = "Прежние результаты восстановлены; неполный лист сохранён под именем " & recoverySheetName
                     End If
                 Else
                     Err.Clear
@@ -179,7 +180,7 @@ Failed:
                 End If
             Else
                 Err.Clear
-                LogRestoreIssue "Не удалось безопасно переименовать неполный лист. Резервная копия сохранена: " & backupWs.Name
+                recoveryNote = "Не удалось безопасно переименовать неполный лист. Резервная копия сохранена: " & backupWs.Name
             End If
         End If
     ElseIf Not ws Is Nothing And Not originalSheetExisted Then
@@ -191,7 +192,8 @@ Failed:
     On Error GoTo 0
     MsgBox IIf(cancelled, "Проверка отменена. Выполнена попытка сохранить прежние результаты.", _
         "Ошибка при анализе Word-отчёта: " & errText & vbCrLf & _
-        "Выполнена попытка восстановления прежних результатов. Проверьте листы книги."), vbExclamation
+        "Выполнена попытка восстановления прежних результатов. Проверьте листы книги.") & _
+        IIf(Len(recoveryNote) > 0, vbCrLf & recoveryNote, ""), vbExclamation
     GoTo RestoreExcel
 
 CleanExit:
@@ -443,10 +445,6 @@ Private Function MentionWorksheetExists(ByVal sheetName As String) As Boolean
     MentionWorksheetExists = Not testWs Is Nothing
     On Error GoTo 0
 End Function
-
-Private Sub LogRestoreIssue(ByVal message As String)
-    Debug.Print Format$(Now, "yyyy-mm-dd hh:nn:ss") & "  " & message
-End Sub
 
 Private Function GetOrCreateReportSheet(ByVal sheetName As String) As Worksheet
     On Error Resume Next
