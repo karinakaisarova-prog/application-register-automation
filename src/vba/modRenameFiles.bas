@@ -17,7 +17,7 @@ Public Sub RenameFilesFromRegister()
     Dim lastRow As Long, r As Long, logRow As Long
     Dim oldPath As String, newPath As String, newName As String, ext As String
     Dim objectName As String, appNo As String, titleText As String
-    Dim plan As Collection, rec As Object, seen As Object, item As Variant
+    Dim plan As Collection, rec As Object, seen As Object, seenSource As Object, item As Variant
     Dim preview As String, problems As String, failure As String, batchId As String
     Dim renamed As Long, failed As Long
     Dim oldScreen As Boolean, oldEvents As Boolean, oldAlerts As Boolean
@@ -48,6 +48,8 @@ Public Sub RenameFilesFromRegister()
     Set plan = New Collection
     Set seen = CreateObject("Scripting.Dictionary")
     seen.CompareMode = vbTextCompare
+    Set seenSource = CreateObject("Scripting.Dictionary")
+    seenSource.CompareMode = vbTextCompare
 
     For r = FIRST_DATA_ROW To lastRow
         DoEvents
@@ -57,6 +59,12 @@ Public Sub RenameFilesFromRegister()
             problems = problems & "Строка " & r & ": исходный файл не найден — " & oldPath & vbCrLf
             GoTo ContinueRow
         End If
+        If seenSource.Exists(oldPath) Then
+            problems = problems & "Строка " & r & ": этот исходный файл уже указан в строке " & _
+                       seenSource(oldPath) & "; повторная обработка пропущена." & vbCrLf
+            GoTo ContinueRow
+        End If
+        seenSource(oldPath) = r
 
         objectName = Trim$(CStr(ws.Cells(r, COL_OBJECT).Value))
         appNo = Trim$(CStr(ws.Cells(r, COL_APP_NUMBER).Value))
