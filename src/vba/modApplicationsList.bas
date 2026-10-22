@@ -149,8 +149,9 @@ Failed:
 CleanExit:
     On Error Resume Next
     If Not backupWs Is Nothing Then
-        ' Last-resort cleanup only when the main operation succeeded; error recovery keeps the backup as the restored sheet.
-        If Err.Number = 0 Then backupWs.Delete
+        ' A remaining backup may be the only recoverable copy after a failed restore.
+        ' Keep it rather than infer success from Err.Number, which may have been cleared.
+        LogLine "Резервная копия сохранена для проверки: " & backupWs.Name
     End If
     Application.ScreenUpdating = oldScreenUpdating
     Application.EnableEvents = oldEnableEvents
