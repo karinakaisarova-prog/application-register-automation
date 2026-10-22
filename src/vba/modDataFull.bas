@@ -14,6 +14,8 @@ Public Sub BuildDataFull()
     Dim sourceWs As Worksheet
     Dim outputWs As Worksheet
     Dim backupWs As Worksheet
+    Dim damagedWs As Worksheet
+    Dim recoverySheetName As String
     Dim outputWasExisting As Boolean
     Dim operationCompleted As Boolean
     Dim lastRow As Long
@@ -140,10 +142,40 @@ Failed:
     On Error Resume Next
     Application.DisplayAlerts = False
     If Not backupWs Is Nothing Then
-        If Not outputWs Is Nothing Then outputWs.Delete
-        backupWs.Name = OUTPUT_SHEET
-        Set outputWs = backupWs
-        Set backupWs = Nothing
+        Set damagedWs = outputWs
+        If damagedWs Is Nothing Then
+            Err.Clear
+            backupWs.Name = OUTPUT_SHEET
+            If Err.Number = 0 Then
+                Set outputWs = backupWs
+                Set backupWs = Nothing
+            End If
+        Else
+            recoverySheetName = GetUniqueDataFullRecoveryName()
+            Err.Clear
+            damagedWs.Name = recoverySheetName
+            If Err.Number = 0 Then
+                Err.Clear
+                backupWs.Name = OUTPUT_SHEET
+                If Err.Number = 0 Then
+                    Set outputWs = backupWs
+                    Set backupWs = Nothing
+                    Err.Clear
+                    damagedWs.Delete
+                    If Err.Number <> 0 Then
+                        Err.Clear
+                        failureText = failureText & vbCrLf & "Предыдущий лист восстановлен; неполный лист сохранён под именем " & recoverySheetName & "."
+                    End If
+                Else
+                    Err.Clear
+                    damagedWs.Name = OUTPUT_SHEET
+                    failureText = failureText & vbCrLf & "Не удалось переименовать резервную копию. Она сохранена под именем " & backupWs.Name & "."
+                End If
+            Else
+                Err.Clear
+                failureText = failureText & vbCrLf & "Не удалось безопасно переименовать неполный лист. Резервная копия сохранена под именем " & backupWs.Name & "."
+            End If
+        End If
     ElseIf Not outputWasExisting And Not outputWs Is Nothing And Not operationCompleted Then
         outputWs.Delete
     End If
@@ -173,6 +205,26 @@ Private Function GetOrCreateDataFullSheet() As Worksheet
         Set GetOrCreateDataFullSheet = ThisWorkbook.Worksheets.Add(After:=ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count))
         GetOrCreateDataFullSheet.Name = OUTPUT_SHEET
     End If
+End Function
+
+Private Function GetUniqueDataFullRecoveryName() As String
+    Dim candidate As String
+    Dim suffix As Long
+    candidate = "_failed_data_full"
+    suffix = 1
+    Do While DataFullWorksheetExists(candidate)
+        candidate = "_failed_df_" & CStr(suffix)
+        suffix = suffix + 1
+    Loop
+    GetUniqueDataFullRecoveryName = candidate
+End Function
+
+Private Function DataFullWorksheetExists(ByVal sheetName As String) As Boolean
+    Dim ws As Worksheet
+    On Error Resume Next
+    Set ws = ThisWorkbook.Worksheets(sheetName)
+    DataFullWorksheetExists = Not ws Is Nothing
+    On Error GoTo 0
 End Function
 
 Private Function GetUniqueDataFullBackupName() As String
