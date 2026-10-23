@@ -262,6 +262,20 @@ if context_module.exists():
         if fragment not in context_source:
             errors.append(f'modWorkbookContext.bas: first-run cleanup guard missing: {fragment}')
 
+# Required launch points must be externally callable macros, not merely private
+# procedures or functions with the same names.
+required_public_subs = {
+    name.lower()
+    for name in re.findall(
+        r'^\s*Public\s+Sub\s+([A-Za-z_][A-Za-z0-9_]*)\b',
+        '\n'.join(path.read_text(encoding='utf-8-sig') for path in modules),
+        re.I | re.M
+    )
+}
+missing_public = sorted(name for name in required if name.lower() not in required_public_subs)
+if missing_public:
+    errors.append('Required entry points must be Public Sub: ' + ', '.join(missing_public))
+
 missing = sorted(x for x in required if x.lower() not in seen)
 if missing:
     errors.append('Missing required entry points: ' + ', '.join(missing))
