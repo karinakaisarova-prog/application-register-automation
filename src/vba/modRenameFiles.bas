@@ -235,7 +235,20 @@ Public Sub RollbackLastRenameBatch()
     Application.ScreenUpdating = False
     Application.EnableEvents = False
 
+    If GetRegisterWorkbook() Is Nothing Then
+        MsgBox "Не найдена книга результата. Сначала запустите автоматизацию и сформируйте перечень.", _
+               vbExclamation, "Откат переименования"
+        GoTo CleanExit
+    End If
+
+    On Error Resume Next
     Set logWs = GetRegisterWorkbook().Worksheets(LOG_SHEET)
+    On Error GoTo Failed
+    If logWs Is Nothing Then
+        MsgBox "Журнал переименования не найден. Пока нет операций, которые можно откатить.", _
+               vbInformation, "Откат переименования"
+        GoTo CleanExit
+    End If
     lastRow = logWs.Cells(logWs.Rows.Count, 1).End(xlUp).Row
     If lastRow < 2 Then
         MsgBox "Журнал переименования пуст.", vbInformation
