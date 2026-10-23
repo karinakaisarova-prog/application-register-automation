@@ -239,7 +239,11 @@ Public Sub CountPagesForRegister()
     Application.ScreenUpdating = False
     Application.EnableEvents = False
 
-    Set ws = ActiveSheet
+    Set ws = GetActiveRegisterSheet()
+    If ws Is Nothing Then
+        MsgBox "Не найден лист перечня в книге результата. Сначала сформируйте перечень.", vbExclamation
+        GoTo CleanExit
+    End If
     lastRow = ws.Cells(ws.Rows.Count, 7).End(xlUp).Row
     If lastRow < 3 Then
         MsgBox "На активном листе нет строк перечня.", vbInformation
