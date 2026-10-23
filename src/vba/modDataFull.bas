@@ -43,7 +43,11 @@ Public Sub BuildDataFull()
     Application.ScreenUpdating = False
     Application.EnableEvents = False
 
-    Set sourceWs = ActiveSheet
+    Set sourceWs = GetActiveRegisterSheet()
+    If sourceWs Is Nothing Then
+        MsgBox "Не найден лист перечня в книге результата. Сначала сформируйте перечень.", vbExclamation
+        GoTo CleanExit
+    End If
     If LCase$(sourceWs.Name) = LCase$(OUTPUT_SHEET) Or LCase$(sourceWs.Name) = "data" Then
         MsgBox "Сначала откройте лист перечня приложений и запустите макрос ещё раз.", vbInformation
         GoTo CleanExit
