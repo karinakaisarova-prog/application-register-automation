@@ -231,7 +231,7 @@ Public Sub RollbackLastRenameBatch()
     Application.ScreenUpdating = False
     Application.EnableEvents = False
 
-    Set logWs = ThisWorkbook.Worksheets(LOG_SHEET)
+    Set logWs = GetRegisterWorkbook().Worksheets(LOG_SHEET)
     lastRow = logWs.Cells(logWs.Rows.Count, 1).End(xlUp).Row
     If lastRow < 2 Then
         MsgBox "Журнал переименования пуст.", vbInformation
@@ -290,7 +290,7 @@ Public Sub RollbackLastRenameBatch()
                     registerRow = CLng(doneItem("RegisterRow"))
                     Set registerWs = Nothing
                     On Error Resume Next
-                    Set registerWs = ThisWorkbook.Worksheets(sheetName)
+                    Set registerWs = GetRegisterWorkbook().Worksheets(sheetName)
                     If Not registerWs Is Nothing And registerRow > 0 Then
                         registerWs.Cells(registerRow, COL_LINK).Hyperlinks.Delete
                         registerWs.Hyperlinks.Add Anchor:=registerWs.Cells(registerRow, COL_LINK), _
@@ -321,7 +321,7 @@ Failed:
         If Len(recoveryError) = 0 Then
             logWs.Cells(logRow, 7).Value = "Переименован"
             Set registerWs = Nothing
-            Set registerWs = ThisWorkbook.Worksheets(CStr(item("SheetName")))
+            Set registerWs = GetRegisterWorkbook().Worksheets(CStr(item("SheetName")))
             If Not registerWs Is Nothing And CLng(item("RegisterRow")) > 0 Then
                 registerWs.Cells(CLng(item("RegisterRow")), COL_LINK).Hyperlinks.Delete
                 registerWs.Hyperlinks.Add Anchor:=registerWs.Cells(CLng(item("RegisterRow")), COL_LINK), _
@@ -406,10 +406,10 @@ End Function
 
 Private Function GetOrCreateRenameLog(ByVal sheetName As String) As Worksheet
     On Error Resume Next
-    Set GetOrCreateRenameLog = ThisWorkbook.Worksheets(sheetName)
+    Set GetOrCreateRenameLog = GetRegisterWorkbook().Worksheets(sheetName)
     On Error GoTo 0
     If GetOrCreateRenameLog Is Nothing Then
-        Set GetOrCreateRenameLog = ThisWorkbook.Worksheets.Add(After:=ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count))
+        Set GetOrCreateRenameLog = GetRegisterWorkbook().Worksheets.Add(After:=GetRegisterWorkbook().Worksheets(GetRegisterWorkbook().Worksheets.Count))
         GetOrCreateRenameLog.Name = sheetName
     End If
 End Function
