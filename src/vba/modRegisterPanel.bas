@@ -42,7 +42,7 @@ Public Sub CreateRegisterControlPanel(ByVal ws As Worksheet)
     DeleteRegisterControlPanel ws
 
     buttonCaptions = Array( _
-        "Создать книгу и перечень", _
+        "Повторно создать перечень", _
         "Анализ упоминаний в отчёте", _
         "Подсчитать страницы", _
         "Создать data_full", _
@@ -54,7 +54,7 @@ Public Sub CreateRegisterControlPanel(ByVal ws As Worksheet)
         "Обновить панель")
 
     macroNames = Array( _
-        "StartRegisterAutomation", _
+        "CreateMultiFolderApplicationsListCorrected", _
         "ScanWordReportMentions", _
         "CountPagesForRegister", _
         "BuildDataFull", _
