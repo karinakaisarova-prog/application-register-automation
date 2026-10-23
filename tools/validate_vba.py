@@ -185,6 +185,17 @@ if table_module.exists():
             if fragment not in caption_code:
                 errors.append('modTableNumbering.bas: caption recognition guard missing: ' + fragment)
 
+# Guard against creating duplicate captions when a visible manual caption already exists.
+if table_module.exists():
+    for fragment in (
+        'Private Function IsTableCaptionText(',
+        'manualCaptionCount = manualCaptionCount + 1',
+        'Not IsTableCaptionText(captionText)',
+        'para.Information(WD_WITHIN_TABLE) = False',
+    ):
+        if fragment not in table_source:
+            errors.append('modTableNumbering.bas: manual-caption protection missing: ' + fragment)
+
 # Guard first-run cleanup: a failed setup must not leave a partially initialized result workbook open.
 context_module = root / 'src' / 'vba' / 'modWorkbookContext.bas'
 if context_module.exists():
