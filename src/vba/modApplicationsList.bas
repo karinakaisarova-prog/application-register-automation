@@ -255,7 +255,7 @@ Private Sub CollectFiles(ByVal rootPath As String, ByVal currentPath As String, 
             If Not mSeenPaths.Exists(CStr(fileItem.Path)) Then
                 mSeenPaths.Add CStr(fileItem.Path), True
                 Set info = ParseFileName(CStr(fileItem.Name))
-                objectName = GetObjectName(rootPath, currentPath, CStr(fileItem.Name))
+                objectName = GetObjectName(currentPath, CStr(fileItem.Name))
                 Dim rec As Object
                 Set rec = CreateObject("Scripting.Dictionary")
                 rec("Path") = CStr(fileItem.Path)
@@ -349,7 +349,7 @@ Private Function ParseFileName(ByVal fileName As String) As Object
     Set ParseFileName = result
 End Function
 
-Private Function GetObjectName(ByVal rootPath As String, ByVal currentPath As String, ByVal fileName As String) As String
+Private Function GetObjectName(ByVal currentPath As String, ByVal fileName As String) As String
     Dim fso As Object
     Dim folderPath As String
     Dim parentPath As String
