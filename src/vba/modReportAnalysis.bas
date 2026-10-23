@@ -101,8 +101,12 @@ Public Sub ScanWordReportMentions()
         If rx.Test(paraText) Then
             Set matches = rx.Execute(paraText)
             On Error Resume Next
+            Err.Clear
             outlineLevel = para.OutlineLevel
-            If Err.Number <> 0 Then
+            If Err.Number = 18 Then
+                On Error GoTo 0
+                GoTo Failed
+            ElseIf Err.Number <> 0 Then
                 Err.Clear
                 outlineLevel = ""
             End If
