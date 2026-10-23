@@ -13,6 +13,8 @@ Public Sub StartRegisterAutomation()
     Dim oldAlerts As Boolean
     Dim oldScreen As Boolean
     Dim dataPath As Variant
+    Dim failureNumber As Long
+    Dim failureDescription As String
 
     oldAlerts = Application.DisplayAlerts
     oldScreen = Application.ScreenUpdating
@@ -75,8 +77,6 @@ Public Sub StartRegisterAutomation()
     Exit Sub
 
 Failed:
-    Dim failureNumber As Long
-    Dim failureDescription As String
     failureNumber = Err.Number
     failureDescription = Err.Description
     On Error Resume Next
@@ -85,10 +85,8 @@ Failed:
         If resultWb.Worksheets.Count = 1 And Len(CStr(resultWb.Worksheets(1).Range("A1").Value)) = 0 Then
             Application.DisplayAlerts = False
             resultWb.Close SaveChanges:=False
+            If resultWb Is gRegisterWorkbook Then Set gRegisterWorkbook = Nothing
         End If
-    End If
-    If Not resultWb Is Nothing Then
-        If resultWb Is gRegisterWorkbook Then Set gRegisterWorkbook = Nothing
     End If
     Application.DisplayAlerts = oldAlerts
     Application.ScreenUpdating = oldScreen
