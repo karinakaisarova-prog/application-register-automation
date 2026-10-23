@@ -27,7 +27,7 @@ Public Sub CheckAndFixWordBulletLists()
     Dim cancelled As Boolean
     Dim answer As VbMsgBoxResult
     Dim groupsFound As Long, paragraphsFound As Long, paragraphsFixed As Long
-    Dim runIndent As Long, currentIndent As Long, unsafeGroupsFound As Long
+    Dim runIndent As Double, currentIndent As Double, unsafeGroupsFound As Long
     Dim unsafeGroup As Boolean
     Dim backupPath As String
     Dim changesStarted As Boolean
@@ -93,7 +93,7 @@ Public Sub CheckAndFixWordBulletLists()
             If GetTypedMarker(txt, markerOffset, markerLength) Then
                 runStart = i
                 unsafeGroup = False
-                runIndent = GetBulletIndentLevel(txt)
+                runIndent = GetBulletIndentLevel(para, txt)
                 j = i
                 Do While j <= pCount
                     Set para = wdDoc.Paragraphs(j)
@@ -102,7 +102,7 @@ Public Sub CheckAndFixWordBulletLists()
                     markerLength = 0
                     If IsNativeWordList(para) Then Exit Do
                     If Not GetTypedMarker(txt, markerOffset, markerLength) Then Exit Do
-                    currentIndent = GetBulletIndentLevel(txt)
+                    currentIndent = GetBulletIndentLevel(para, txt)
                     If currentIndent <> runIndent Then unsafeGroup = True
                     j = j + 1
                 Loop
@@ -402,9 +402,17 @@ Private Function GetTypedMarker(ByVal paragraphText As String, ByRef markerOffse
     GetTypedMarker = True
 End Function
 
-Private Function GetBulletIndentLevel(ByVal paragraphText As String) As Long
+Private Function GetBulletIndentLevel(ByVal para As Object, ByVal paragraphText As String) As Double
     Dim i As Long
     Dim ch As String
+    On Error Resume Next
+    GetBulletIndentLevel = CDbl(para.Format.LeftIndent)
+    If Err.Number <> 0 Then
+        Err.Clear
+        GetBulletIndentLevel = 0
+    End If
+    On Error GoTo 0
+
     paragraphText = Replace(paragraphText, vbCr, "")
     paragraphText = Replace(paragraphText, Chr$(7), "")
     For i = 1 To Len(paragraphText)
