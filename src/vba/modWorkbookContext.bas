@@ -86,3 +86,34 @@ Public Function GetRegisterWorkbook() As Workbook
         Set GetRegisterWorkbook = ActiveWorkbook
     End If
 End Function
+
+
+Public Function GetActiveRegisterSheet() As Worksheet
+    Dim wb As Workbook
+    Dim ws As Worksheet
+
+    Set wb = GetRegisterWorkbook()
+    If wb Is Nothing Then Exit Function
+
+    If Not ActiveWorkbook Is Nothing Then
+        If ActiveWorkbook Is wb Then
+            If TypeName(ActiveSheet) = "Worksheet" Then
+                If Trim$(CStr(ActiveSheet.Cells(2, 1).Value)) = "№ п/п" And _
+                   Trim$(CStr(ActiveSheet.Cells(2, 6).Value)) = "Ответственное лицо" And _
+                   Trim$(CStr(ActiveSheet.Cells(2, 8).Value)) = "Раздел" Then
+                    Set GetActiveRegisterSheet = ActiveSheet
+                    Exit Function
+                End If
+            End If
+        End If
+    End If
+
+    For Each ws In wb.Worksheets
+        If Trim$(CStr(ws.Cells(2, 1).Value)) = "№ п/п" And _
+           Trim$(CStr(ws.Cells(2, 6).Value)) = "Ответственное лицо" And _
+           Trim$(CStr(ws.Cells(2, 8).Value)) = "Раздел" Then
+            Set GetActiveRegisterSheet = ws
+            Exit Function
+        End If
+    Next ws
+End Function
