@@ -247,20 +247,24 @@ if table_module.exists():
         if fragment not in table_source:
             errors.append('modTableNumbering.bas: manual-caption protection missing: ' + fragment)
 
-# Guard first-run cleanup: a failed setup must not leave a partially initialized result workbook open.
+# Guard the current single-workbook startup design. The startup macro must
+# validate the exact data sheet, assign the selected workbook context, and
+# report a handled error without silently swallowing it. Do not assert resultWb
+# cleanup: this version intentionally does not create a separate result workbook.
 context_module = root / 'src' / 'vba' / 'modWorkbookContext.bas'
 if context_module.exists():
     context_source = context_module.read_text(encoding='utf-8-sig')
     startup_guards = (
+        'Set sourceWb = ThisWorkbook',
+        'Set sourceData = sourceWb.Worksheets("data")',
+        'Set gRegisterWorkbook = sourceWb',
+        'CreateMultiFolderApplicationsListCorrected',
         'failureNumber = Err.Number',
         'failureDescription = Err.Description',
-        'If Not resultWb Is Nothing Then',
-        'resultWb.Close SaveChanges:=False',
-        'If resultWb Is gRegisterWorkbook Then Set gRegisterWorkbook = Nothing',
     )
     for fragment in startup_guards:
         if fragment not in context_source:
-            errors.append(f'modWorkbookContext.bas: first-run cleanup guard missing: {fragment}')
+            errors.append(f'modWorkbookContext.bas: single-workbook startup guard missing: {fragment}')
 
 # Required launch points must be externally callable macros, not merely private
 # procedures or functions with the same names.
