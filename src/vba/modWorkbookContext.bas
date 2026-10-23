@@ -8,48 +8,84 @@ Public gRegisterWorkbook As Workbook
 Public Sub StartRegisterAutomation()
     Dim sourceWb As Workbook
     Dim resultWb As Workbook
+    Dim dataWb As Workbook
     Dim sourceData As Worksheet
     Dim oldAlerts As Boolean
-    Dim dataCopied As Boolean
+    Dim oldScreen As Boolean
+    Dim dataPath As Variant
 
-    On Error GoTo Failed
-    Set sourceWb = ThisWorkbook
     oldAlerts = Application.DisplayAlerts
+    oldScreen = Application.ScreenUpdating
+    On Error GoTo Failed
+
+    Set sourceWb = ThisWorkbook
+    On Error Resume Next
+    Set sourceData = sourceWb.Worksheets("data")
+    On Error GoTo Failed
+
+    ' If the macro host has no data sheet, let the user choose the workbook
+    ' that already contains the reference sheet. No blank workbook is created
+    ' until this step succeeds or the user explicitly proceeds without data.
+    If sourceData Is Nothing Then
+        dataPath = Application.GetOpenFilename( _
+            FileFilter:="Книги Excel (*.xlsx;*.xlsm;*.xlsb),*.xlsx;*.xlsm;*.xlsb", _
+            Title:="Выберите Excel-файл со справочным листом data (Отмена — выход)")
+        If VarType(dataPath) = vbBoolean And dataPath = False Then
+            MsgBox "Запуск отменён. Книга результата не создавалась.", vbInformation, "Автоматизация перечня"
+            Exit Sub
+        End If
+
+        Set dataWb = Workbooks.Open(Filename:=CStr(dataPath), ReadOnly:=True, UpdateLinks:=False)
+        On Error Resume Next
+        Set sourceData = dataWb.Worksheets("data")
+        On Error GoTo Failed
+
+        If sourceData Is Nothing Then
+            dataWb.Close SaveChanges:=False
+            Set dataWb = Nothing
+            MsgBox "В выбранной книге не найден лист с точным именем 'data'." & vbCrLf & _
+                   "Переименуйте справочный лист в data и запустите макрос снова. Книга результата не создавалась.", _
+                   vbExclamation, "Нет справочника data"
+            Exit Sub
+        End If
+    End If
 
     Application.ScreenUpdating = False
     Set resultWb = Workbooks.Add(xlWBATWorksheet)
     Set gRegisterWorkbook = resultWb
 
-    On Error Resume Next
-    Set sourceData = sourceWb.Worksheets("data")
-    On Error GoTo Failed
+    sourceData.Copy Before:=resultWb.Worksheets(1)
+    Application.DisplayAlerts = False
+    resultWb.Worksheets(resultWb.Worksheets.Count).Delete
+    Application.DisplayAlerts = oldAlerts
 
-    If Not sourceData Is Nothing Then
-        sourceData.Copy Before:=resultWb.Worksheets(1)
-        Application.DisplayAlerts = False
-        resultWb.Worksheets(resultWb.Worksheets.Count).Delete
-        Application.DisplayAlerts = oldAlerts
-        dataCopied = True
+    If Not dataWb Is Nothing Then
+        dataWb.Close SaveChanges:=False
+        Set dataWb = Nothing
     End If
 
     resultWb.Activate
-    Application.ScreenUpdating = True
+    Application.ScreenUpdating = oldScreen
 
-    If dataCopied Then
-        MsgBox "Создана новая книга для перечня. Справочник data скопирован из книги с макросами.", _
-               vbInformation, "Автоматизация перечня"
-    Else
-        MsgBox "Создана новая книга для перечня, но лист справочника data не найден в книге с макросами." & _
-               vbCrLf & "Перечень можно сформировать, однако отдел и ответственные лица могут не заполниться автоматически.", _
-               vbExclamation, "Нет справочника data"
-    End If
+    MsgBox "Создана новая книга для перечня. Справочник data скопирован." & vbCrLf & _
+           "Книгу с макросами оставьте открытой, пока используете кнопки на листе результата.", _
+           vbInformation, "Автоматизация перечня"
 
     CreateMultiFolderApplicationsListCorrected
     Exit Sub
 
 Failed:
+    On Error Resume Next
+    If Not dataWb Is Nothing Then dataWb.Close SaveChanges:=False
+    If Not resultWb Is Nothing Then
+        If resultWb.Worksheets.Count = 1 And Len(CStr(resultWb.Worksheets(1).Range("A1").Value)) = 0 Then
+            Application.DisplayAlerts = False
+            resultWb.Close SaveChanges:=False
+        End If
+    End If
     Application.DisplayAlerts = oldAlerts
-    Application.ScreenUpdating = True
+    Application.ScreenUpdating = oldScreen
+    On Error GoTo 0
     MsgBox "Не удалось подготовить книгу для перечня." & vbCrLf & _
            "Ошибка " & Err.Number & ": " & Err.Description, vbExclamation, "Автоматизация перечня"
 End Sub
@@ -81,10 +117,8 @@ Public Function GetRegisterWorkbook() As Workbook
         Next ws
     Next wb
 
-    ' Do not silently fall back to the macro-host workbook: that could overwrite or
-    ' create result sheets in the wrong file. Callers must handle Nothing safely.
+    ' Do not silently fall back to the macro-host workbook: callers must handle Nothing.
 End Function
-
 
 Public Function GetActiveRegisterSheet() As Worksheet
     Dim wb As Workbook
