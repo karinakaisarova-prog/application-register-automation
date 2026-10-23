@@ -82,11 +82,12 @@ Failed:
     On Error Resume Next
     If Not dataWb Is Nothing Then dataWb.Close SaveChanges:=False
     If Not resultWb Is Nothing Then
-        If resultWb.Worksheets.Count = 1 And Len(CStr(resultWb.Worksheets(1).Range("A1").Value)) = 0 Then
-            Application.DisplayAlerts = False
-            resultWb.Close SaveChanges:=False
-            If resultWb Is gRegisterWorkbook Then Set gRegisterWorkbook = Nothing
-        End If
+        ' This handler is reached only before the list-building procedure is called.
+        ' The result workbook is therefore incomplete and must not be left open,
+        ' even if the copied data sheet is already present.
+        Application.DisplayAlerts = False
+        resultWb.Close SaveChanges:=False
+        If resultWb Is gRegisterWorkbook Then Set gRegisterWorkbook = Nothing
     End If
     Application.DisplayAlerts = oldAlerts
     Application.ScreenUpdating = oldScreen
