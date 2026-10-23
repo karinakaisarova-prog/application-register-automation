@@ -163,6 +163,15 @@ if rename_module.exists():
         if fragment not in rename_source:
             errors.append(f'modRenameFiles.bas: reverse-order recovery logic missing: {fragment}')
 
+    # A no-op first candidate must still reserve its source path, otherwise a
+    # duplicate register row can rename the same physical file a second time.
+    source_claim = rename_source.find('seenSource(oldPath) = r')
+    no_op_check = rename_source.find('If StrComp(oldPath, newPath, vbTextCompare) = 0 Then')
+    if source_claim < 0 or no_op_check < 0 or source_claim > no_op_check:
+        errors.append('modRenameFiles.bas: source path must be claimed before the no-op rename check')
+    if 'имя файла уже соответствует полям перечня; переименование не требуется.' not in rename_source:
+        errors.append('modRenameFiles.bas: no-op rename candidate should be reported as a skipped row')
+
 # Guard table-caption recognition: a SEQ field must be in the nearest non-empty
 # paragraph and the visible paragraph must start with the expected caption label.
 table_module = root / 'src' / 'vba' / 'modTableNumbering.bas'
