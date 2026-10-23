@@ -144,7 +144,12 @@ if list_module.exists():
         # Boundary characters are defined in FindObjectInText, which owns
         # the regular expression; GetObjectName only walks folders and calls it.
         boundary_match = re.search(
-            r'Private Function FindObjectInText\\b(.*?)^End Function\\s*
+            r'Private Function FindObjectInText\b(.*?)^End Function\s*$',
+            source, re.I | re.M | re.S
+        )
+        if not boundary_match or 'Ёё' not in boundary_match.group(1):
+            errors.append('modApplicationsList.bas: object-name boundaries must treat Ё/ё as Cyrillic letters')
+
 # Special department marker applies only to the two explicitly named base filenames.
 if list_module.exists():
     special_source = list_module.read_text(encoding='utf-8-sig')
