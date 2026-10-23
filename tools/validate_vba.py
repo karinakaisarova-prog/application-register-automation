@@ -110,17 +110,7 @@ list_module = root / 'src' / 'vba' / 'modApplicationsList.bas'
 if list_module.exists():
     source = list_module.read_text(encoding='utf-8-sig')
     object_match = re.search(
-        r'Private Function GetObjectName\\b(.*?)^End Function\\s*if missing:
-    errors.append('Missing required entry points: ' + ', '.join(missing))
-
-print(f'Modules scanned: {len(modules)}; procedures/functions: {sum(len(x) for x in seen.values())}')
-if errors:
-    print('\n'.join('ERROR: ' + x for x in errors))
-    sys.exit(1)
-
-print('PASS: no duplicate procedure names, unmatched procedure endings, or unresolved GoTo labels; required entry points found.')
-print('NOTE: this is static validation, not VBA compilation or Excel/Word runtime testing.')
-,
+        r'Private Function GetObjectName\b(.*?)^End Function\s*$',
         source, re.I | re.M | re.S
     )
     if not object_match:
@@ -129,7 +119,7 @@ print('NOTE: this is static validation, not VBA compilation or Excel/Word runtim
         object_code = object_match.group(1)
         if 'fso.GetParentFolderName(folderPath)' not in object_code:
             errors.append('modApplicationsList.bas: GetObjectName must walk parent folders')
-        if re.search(r'StrComp\\(\\s*folderPath\\s*,\\s*rootPath', object_code, re.I):
+        if re.search(r'StrComp\(\s*folderPath\s*,\s*rootPath', object_code, re.I):
             errors.append('modApplicationsList.bas: GetObjectName must not stop at the selected root')
 
 readme = root / 'README.md'
