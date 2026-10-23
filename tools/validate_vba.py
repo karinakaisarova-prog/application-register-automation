@@ -11,6 +11,8 @@ for path in modules:
     lines = path.read_text(encoding='utf-8-sig').splitlines()
     stack = []
     for number, line in enumerate(lines, 1):
+        if re.search(r'\\bFreezePanes\\b', line, re.I):
+            errors.append(f'{path.relative_to(root)}:{number}: unexpected FreezePanes reference')
         match = re.match(r'^\s*(?:(?:Public|Private|Friend)\s+)?(Sub|Function)\s+([A-Za-z_][A-Za-z0-9_]*)\b', line, re.I)
         end = re.match(r'^\s*End\s+(Sub|Function)\s*$', line, re.I)
         if match:
