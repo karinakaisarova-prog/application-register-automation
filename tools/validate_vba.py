@@ -169,7 +169,7 @@ table_module = root / 'src' / 'vba' / 'modTableNumbering.bas'
 if table_module.exists():
     table_source = table_module.read_text(encoding='utf-8-sig')
     caption_match = re.search(
-        r'Private Function HasTableSequenceField\\b(.*?)^End Function\\s*
+        r'Private Function HasTableSequenceField\b(.*?)^End Function\s*
 context_module = root / 'src' / 'vba' / 'modWorkbookContext.bas'
 if context_module.exists():
     context_source = context_module.read_text(encoding='utf-8-sig')
