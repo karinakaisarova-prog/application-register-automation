@@ -420,7 +420,7 @@ End Function
 
 Private Function CleanFileName(ByVal value As String) As String
     Dim invalidChars As Variant, i As Long
-    invalidChars = Array("\", "/", ":", "*", "?", """", "<", ">", "|")
+    invalidChars = Array("\", "/", ":", "*", "?", """"", "<", ">", "|")
     For i = LBound(invalidChars) To UBound(invalidChars)
         value = Replace(value, CStr(invalidChars(i)), "_")
     Next i
