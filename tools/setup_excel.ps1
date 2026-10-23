@@ -65,6 +65,15 @@ try {
         throw "В выбранной книге не найден лист с точным именем data. Закройте установщик, выберите правильную рабочую копию и повторите."
     }
 
+    # Check programmatic VBA access before changing the file format or workbook contents.
+    try {
+        $vbProject = $workbook.VBProject
+        $null = $vbProject.VBComponents.Count
+    }
+    catch {
+        throw ("Excel заблокировал автоматическое добавление VBA-модулей. В Excel откройте Файл → Параметры → Центр управления безопасностью → Параметры центра управления безопасностью → Параметры макросов и включите «Доверять доступ к объектной модели проектов VBA». Затем закройте Excel и запустите установщик снова. Включайте эту настройку только если понимаете риск и доверяете исходникам проекта. Подробности: " + $_.Exception.Message)
+    }
+
     # .xlsx/.xlsb/.xls cannot store VBA projects. Convert the selected working copy
     # to a macro-enabled workbook in the same folder; existing .xlsm is edited in place.
     if (-not [string]::Equals([IO.Path]::GetExtension($workbookPath), ".xlsm", [StringComparison]::OrdinalIgnoreCase)) {
@@ -74,14 +83,6 @@ try {
         }
         $workbook.SaveAs($finalPath, 52)
         Write-Host ("Рабочая книга преобразована в формат .xlsm: " + $finalPath)
-    }
-
-    try {
-        $vbProject = $workbook.VBProject
-        $null = $vbProject.VBComponents.Count
-    }
-    catch {
-        throw ("Excel заблокировал автоматическое добавление VBA-модулей. В Excel откройте Файл → Параметры → Центр управления безопасностью → Параметры центра управления безопасностью → Параметры макросов и включите «Доверять доступ к объектной модели проектов VBA». Затем закройте Excel и запустите установщик снова. Включайте эту настройку только если понимаете риск и доверяете исходникам проекта. Подробности: " + $_.Exception.Message)
     }
 
     # Replace same-named project modules so repeated installation does not create duplicates.
