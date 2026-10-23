@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 
 # Installs project VBA modules directly into the user's already-created working copy.
 # If the chosen file is not .xlsm, Excel converts it to .xlsm because other formats cannot store VBA.
@@ -45,6 +45,19 @@ $excel = $null
 $workbook = $null
 $success = $false
 $finalPath = $workbookPath
+$backupPath = $null
+
+# Preserve the selected workbook before any Excel automation or format conversion.
+try {
+    $stamp = Get-Date -Format "yyyyMMdd_HHmmss"
+    $backupPath = $workbookPath + ".backup_before_macro_install_" + $stamp
+    Copy-Item -LiteralPath $workbookPath -Destination $backupPath -ErrorAction Stop
+    Write-Host ("Резервная копия исходной книги: " + $backupPath)
+}
+catch {
+    throw ("Не удалось создать резервную копию исходной книги. Установка остановлена без изменений. Подробности: " + $_.Exception.Message)
+}
+
 try {
     $excel = New-Object -ComObject Excel.Application
     $excel.Visible = $false
@@ -121,5 +134,6 @@ if ($success) {
     Write-Host "Лист data и остальные листы остались в этой же книге. Перечень будет создаваться в ней же."
     Write-Host "Откройте эту .xlsm-книгу и выполните Alt+F11 → Debug → Compile VBAProject."
     Write-Host "Не запускайте макросы до успешной компиляции."
+    Write-Host ("Резервная копия исходной книги сохранена здесь: " + $backupPath)
     Read-Host "Нажмите Enter для завершения"
 }
