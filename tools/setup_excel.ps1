@@ -50,7 +50,8 @@ $backupPath = $null
 # Preserve the selected workbook before any Excel automation or format conversion.
 try {
     $stamp = Get-Date -Format "yyyyMMdd_HHmmss"
-    $backupPath = $workbookPath + ".backup_before_macro_install_" + $stamp
+    $backupName = [IO.Path]::GetFileNameWithoutExtension($workbookPath) + ".backup_before_macro_install_" + $stamp + [IO.Path]::GetExtension($workbookPath)
+    $backupPath = Join-Path ([IO.Path]::GetDirectoryName($workbookPath)) $backupName
     Copy-Item -LiteralPath $workbookPath -Destination $backupPath -ErrorAction Stop
     Write-Host ("Резервная копия исходной книги: " + $backupPath)
 }
