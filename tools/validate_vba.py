@@ -284,6 +284,26 @@ missing = sorted(x for x in required if x.lower() not in seen)
 if missing:
     errors.append('Missing required entry points: ' + ', '.join(missing))
 
+
+# Guard the installer contract: every VBA source module must be listed exactly
+# once in the installer, and the CMD launcher must stay ASCII-only because
+# Windows CMD can misread UTF-8 Cyrillic text depending on the active code page.
+installer_path = root / 'tools' / 'setup_excel.ps1'
+launcher_path = root / 'tools' / 'Установить_книгу_Excel.cmd'
+if installer_path.exists():
+    installer_source = installer_path.read_text(encoding='utf-8-sig')
+    listed_modules = re.findall(r'"(mod[A-Za-z0-9]+\.bas)"', installer_source)
+    expected_modules = sorted(path.name for path in modules)
+    if sorted(listed_modules) != expected_modules:
+        errors.append(
+            'setup_excel.ps1: module list does not match src/vba files; '
+            f'listed={sorted(listed_modules)}, expected={expected_modules}'
+        )
+if launcher_path.exists():
+    launcher_bytes = launcher_path.read_bytes()
+    if any(byte > 127 for byte in launcher_bytes):
+        errors.append('Установить_книгу_Excel.cmd: launcher must remain ASCII-only')
+
 print(f'Modules scanned: {len(modules)}; procedures/functions: {sum(len(x) for x in seen.values())}')
 if errors:
     print('\n'.join('ERROR: ' + x for x in errors))
