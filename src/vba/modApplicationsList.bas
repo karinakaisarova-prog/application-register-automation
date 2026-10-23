@@ -602,7 +602,7 @@ Private Function IsSpecialDepartmentFile(ByVal fileNameOrNumber As String, ByVal
     normalizedFile = LCase$(Trim$(Replace(baseName, "ё", "е")))
 
     ' Match only exact base filenames, never a generic parsed title.
-    IsSpecialDepartmentFile = (normalizedFile = "отчет 2 кв 2026" Or _
+    IsSpecialDepartmentFile = (normalizedFile = "отчет_2 кв 2026" Or _
                                normalizedFile = "реестр рисков")
 End Function
 
