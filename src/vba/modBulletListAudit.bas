@@ -10,6 +10,10 @@ Private Const FIRST_DATA_ROW As Long = 2
 Private Const WD_LIST_NO_NUMBERING As Long = 0
 
 Public Sub CheckAndFixWordBulletLists()
+    If GetRegisterWorkbook() Is Nothing Then
+        MsgBox "Сначала запустите StartRegisterAutomation, чтобы создать книгу результата.", vbExclamation, "Книга результата не найдена"
+        Exit Sub
+    End If
     Dim fd As FileDialog
     Dim reportPath As String
     Dim wdApp As Object
