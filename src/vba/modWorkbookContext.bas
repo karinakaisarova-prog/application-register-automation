@@ -1,23 +1,16 @@
 Attribute VB_Name = "modWorkbookContext"
 Option Explicit
 
-' Книга с макросами и книга с результатом — разные книги.
-' Запускатель создаёт книгу результата; остальные процедуры работают с ней.
+' Книга с макросами, справочником data и перечнем — одна и та же книга.
+' Запускатель работает в ThisWorkbook и не создаёт отдельную книгу результата.
 Public gRegisterWorkbook As Workbook
 
 Public Sub StartRegisterAutomation()
     Dim sourceWb As Workbook
-    Dim resultWb As Workbook
-    Dim dataWb As Workbook
     Dim sourceData As Worksheet
-    Dim oldAlerts As Boolean
-    Dim oldScreen As Boolean
-    Dim dataPath As Variant
     Dim failureNumber As Long
     Dim failureDescription As String
 
-    oldAlerts = Application.DisplayAlerts
-    oldScreen = Application.ScreenUpdating
     On Error GoTo Failed
 
     Set sourceWb = ThisWorkbook
@@ -25,52 +18,19 @@ Public Sub StartRegisterAutomation()
     Set sourceData = sourceWb.Worksheets("data")
     On Error GoTo Failed
 
-    ' If the macro host has no data sheet, let the user choose a workbook
-    ' that contains the required reference sheet. If the user cancels or the
-    ' sheet is missing, do not create a result workbook.
     If sourceData Is Nothing Then
-        dataPath = Application.GetOpenFilename( _
-            FileFilter:="Книги Excel (*.xlsx;*.xlsm;*.xlsb),*.xlsx;*.xlsm;*.xlsb", _
-            Title:="Выберите Excel-файл со справочным листом data (Отмена — выход)")
-        If VarType(dataPath) = vbBoolean And dataPath = False Then
-            MsgBox "Запуск отменён. Книга результата не создавалась.", vbInformation, "Автоматизация перечня"
-            Exit Sub
-        End If
-
-        Set dataWb = Workbooks.Open(Filename:=CStr(dataPath), ReadOnly:=True, UpdateLinks:=False)
-        On Error Resume Next
-        Set sourceData = dataWb.Worksheets("data")
-        On Error GoTo Failed
-
-        If sourceData Is Nothing Then
-            dataWb.Close SaveChanges:=False
-            Set dataWb = Nothing
-            MsgBox "В выбранной книге не найден лист с точным именем 'data'." & vbCrLf & _
-                   "Переименуйте справочный лист в data и запустите макрос снова. Книга результата не создавалась.", _
-                   vbExclamation, "Нет справочника data"
-            Exit Sub
-        End If
+        MsgBox "В этой книге не найден лист с точным именем 'data'." & vbCrLf & _
+               "Откройте подготовленную книгу, содержащую справочник data и макросы. " & _
+               "Перечень будет создан в этой же книге.", _
+               vbExclamation, "Нет справочника data"
+        Exit Sub
     End If
 
-    Application.ScreenUpdating = False
-    Set resultWb = Workbooks.Add(xlWBATWorksheet)
-    Set gRegisterWorkbook = resultWb
+    Set gRegisterWorkbook = sourceWb
+    sourceWb.Activate
 
-    sourceData.Copy Before:=resultWb.Worksheets(1)
-    Application.DisplayAlerts = False
-    resultWb.Worksheets(resultWb.Worksheets.Count).Delete
-    Application.DisplayAlerts = oldAlerts
-
-    If Not dataWb Is Nothing Then
-        dataWb.Close SaveChanges:=False
-        Set dataWb = Nothing
-    End If
-
-    resultWb.Activate
-    Application.ScreenUpdating = oldScreen
-
-    MsgBox "Создана новая книга для перечня. Справочник data скопирован." & vbCrLf & _
-           "Книгу с макросами оставьте открытой, пока используете кнопки на листе результата.", _
+    MsgBox "Перечень будет создан в этой же книге, где находится лист data." & vbCrLf & _
+           "Исходные документы останутся в выбранных папках; в Excel будут записаны ссылки на них.", _
            vbInformation, "Автоматизация перечня"
 
     CreateMultiFolderApplicationsListCorrected
@@ -79,27 +39,17 @@ Public Sub StartRegisterAutomation()
 Failed:
     failureNumber = Err.Number
     failureDescription = Err.Description
-    On Error Resume Next
-    If Not dataWb Is Nothing Then dataWb.Close SaveChanges:=False
-    If Not resultWb Is Nothing Then
-        ' This handler is reached only before the list-building procedure is called.
-        ' The result workbook is therefore incomplete and must not be left open,
-        ' even if the copied data sheet is already present.
-        Application.DisplayAlerts = False
-        resultWb.Close SaveChanges:=False
-        If resultWb Is gRegisterWorkbook Then Set gRegisterWorkbook = Nothing
-    End If
-    Application.DisplayAlerts = oldAlerts
-    Application.ScreenUpdating = oldScreen
     On Error GoTo 0
-    MsgBox "Не удалось подготовить книгу для перечня." & vbCrLf & _
-           "Ошибка " & failureNumber & ": " & failureDescription, vbExclamation, "Автоматизация перечня"
+    MsgBox "Не удалось запустить формирование перечня." & vbCrLf & _
+           "Ошибка " & failureNumber & ": " & failureDescription, _
+           vbExclamation, "Автоматизация перечня"
 End Sub
 
 Public Function GetRegisterWorkbook() As Workbook
     Dim wb As Workbook
     Dim ws As Worksheet
 
+    ' Prefer the workbook explicitly selected by the startup procedure.
     On Error Resume Next
     If Not gRegisterWorkbook Is Nothing Then
         Set ws = gRegisterWorkbook.Worksheets(1)
@@ -110,6 +60,16 @@ Public Function GetRegisterWorkbook() As Workbook
     End If
     Err.Clear
     On Error GoTo 0
+
+    ' The macro workbook is the intended home for the data sheet and register.
+    On Error Resume Next
+    Set ws = ThisWorkbook.Worksheets("data")
+    On Error GoTo 0
+    If Not ws Is Nothing Then
+        Set gRegisterWorkbook = ThisWorkbook
+        Set GetRegisterWorkbook = ThisWorkbook
+        Exit Function
+    End If
 
     ' Fallback after a VBA reset: identify a workbook by the register title/header.
     For Each wb In Application.Workbooks
@@ -122,8 +82,6 @@ Public Function GetRegisterWorkbook() As Workbook
             End If
         Next ws
     Next wb
-
-    ' Do not silently fall back to the macro-host workbook: callers must handle Nothing.
 End Function
 
 Public Function GetActiveRegisterSheet() As Worksheet
