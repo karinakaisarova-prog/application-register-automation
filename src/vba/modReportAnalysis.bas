@@ -63,15 +63,15 @@ Public Sub ScanWordReportMentions()
 
     ' Preserve previous results until the new scan completes successfully.
     On Error Resume Next
-    Set ws = ThisWorkbook.Worksheets(RESULT_SHEET)
+    Set ws = GetRegisterWorkbook().Worksheets(RESULT_SHEET)
     On Error GoTo Failed
     originalSheetExisted = Not (ws Is Nothing)
     If originalSheetExisted Then
         ws.Copy After:=ws
         Set backupWs = ActiveSheet
-        backupName = "tmpMentions_" & Format$(Now, "yymmdd_hhnnss") & "_" & CStr(ThisWorkbook.Worksheets.Count)
+        backupName = "tmpMentions_" & Format$(Now, "yymmdd_hhnnss") & "_" & CStr(GetRegisterWorkbook().Worksheets.Count)
         backupWs.Name = backupName
-        Set ws = ThisWorkbook.Worksheets(RESULT_SHEET)
+        Set ws = GetRegisterWorkbook().Worksheets(RESULT_SHEET)
     Else
         Set ws = GetOrCreateReportSheet(RESULT_SHEET)
     End If
@@ -441,17 +441,17 @@ End Function
 Private Function MentionWorksheetExists(ByVal sheetName As String) As Boolean
     Dim testWs As Worksheet
     On Error Resume Next
-    Set testWs = ThisWorkbook.Worksheets(sheetName)
+    Set testWs = GetRegisterWorkbook().Worksheets(sheetName)
     MentionWorksheetExists = Not testWs Is Nothing
     On Error GoTo 0
 End Function
 
 Private Function GetOrCreateReportSheet(ByVal sheetName As String) As Worksheet
     On Error Resume Next
-    Set GetOrCreateReportSheet = ThisWorkbook.Worksheets(sheetName)
+    Set GetOrCreateReportSheet = GetRegisterWorkbook().Worksheets(sheetName)
     On Error GoTo 0
     If GetOrCreateReportSheet Is Nothing Then
-        Set GetOrCreateReportSheet = ThisWorkbook.Worksheets.Add(After:=ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count))
+        Set GetOrCreateReportSheet = GetRegisterWorkbook().Worksheets.Add(After:=GetRegisterWorkbook().Worksheets(GetRegisterWorkbook().Worksheets.Count))
         GetOrCreateReportSheet.Name = sheetName
     End If
 End Function
