@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 
-# Creates a macro-enabled COPY of the user's existing workbook, preserving all sheets,
-# imports the project's VBA modules, and leaves the original workbook untouched.
+# Installs project VBA modules directly into the user's already-created working copy.
+# If the chosen file is not .xlsm, Excel converts it to .xlsm because other formats cannot store VBA.
 # Requires Windows, desktop Excel, and trusted access to the VBA project object model.
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $vbaDir = Join-Path $repoRoot "src\vba"
@@ -25,66 +25,55 @@ foreach ($name in $moduleFiles) {
 }
 
 Add-Type -AssemblyName System.Windows.Forms
-
-$sourceDialog = New-Object System.Windows.Forms.OpenFileDialog
+$dialog = New-Object System.Windows.Forms.OpenFileDialog
 try {
-    $sourceDialog.Title = "Выберите ваш Excel-файл с листом data"
-    $sourceDialog.Filter = "Книги Excel (*.xlsx;*.xlsm;*.xlsb;*.xls)|*.xlsx;*.xlsm;*.xlsb;*.xls"
-    $sourceDialog.Multiselect = $false
-    $sourceDialog.CheckFileExists = $true
-    if ($sourceDialog.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) {
-        Write-Host "Установка отменена. Ничего не создано." -ForegroundColor Yellow
+    $dialog.Title = "Выберите свою рабочую копию Excel-книги с листом data"
+    $dialog.Filter = "Книги Excel (*.xlsm;*.xlsx;*.xlsb;*.xls)|*.xlsm;*.xlsx;*.xlsb;*.xls"
+    $dialog.Multiselect = $false
+    $dialog.CheckFileExists = $true
+    if ($dialog.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) {
+        Write-Host "Установка отменена. Ничего не изменено." -ForegroundColor Yellow
         exit 0
     }
-    $sourcePath = [IO.Path]::GetFullPath($sourceDialog.FileName)
+    $workbookPath = [IO.Path]::GetFullPath($dialog.FileName)
 }
 finally {
-    $sourceDialog.Dispose()
-}
-
-$outputDialog = New-Object System.Windows.Forms.SaveFileDialog
-try {
-    $outputDialog.Title = "Сохранить копию этой книги с макросами"
-    $outputDialog.Filter = "Книга Excel с поддержкой макросов (*.xlsm)|*.xlsm"
-    $outputDialog.FileName = ([IO.Path]::GetFileNameWithoutExtension($sourcePath) + "_с_макросами.xlsm")
-    $outputDialog.OverwritePrompt = $true
-    $outputDialog.InitialDirectory = [IO.Path]::GetDirectoryName($sourcePath)
-    if ($outputDialog.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) {
-        Write-Host "Установка отменена. Ничего не создано." -ForegroundColor Yellow
-        exit 0
-    }
-    $outputPath = [IO.Path]::GetFullPath($outputDialog.FileName)
-    if ([IO.Path]::GetExtension($outputPath) -ne ".xlsm") {
-        $outputPath += ".xlsm"
-    }
-    if ([string]::Equals($sourcePath, $outputPath, [StringComparison]::OrdinalIgnoreCase)) {
-        throw "Нельзя сохранять поверх исходного файла. Выберите другое имя: оригинал останется без изменений."
-    }
-}
-finally {
-    $outputDialog.Dispose()
+    $dialog.Dispose()
 }
 
 $excel = $null
 $workbook = $null
 $success = $false
+$finalPath = $workbookPath
 try {
     $excel = New-Object -ComObject Excel.Application
     $excel.Visible = $false
     $excel.DisplayAlerts = $false
     $excel.AskToUpdateLinks = $false
 
-    $workbook = $excel.Workbooks.Open($sourcePath, 0, $true)
+    # Open the already-existing working copy for editing, not read-only.
+    $workbook = $excel.Workbooks.Open($workbookPath, 0, $false)
 
-    $sourceData = $null
+    $dataSheet = $null
     foreach ($sheet in $workbook.Worksheets) {
         if ([string]::Equals([string]$sheet.Name, "data", [StringComparison]::Ordinal)) {
-            $sourceData = $sheet
+            $dataSheet = $sheet
             break
         }
     }
-    if ($sourceData -eq $null) {
-        throw "В выбранной книге не найден лист с точным именем data. Исходная книга не изменена. Выберите правильный файл."
+    if ($dataSheet -eq $null) {
+        throw "В выбранной книге не найден лист с точным именем data. Закройте установщик, выберите правильную рабочую копию и повторите."
+    }
+
+    # .xlsx/.xlsb/.xls cannot store VBA projects. Convert the selected working copy
+    # to a macro-enabled workbook in the same folder; existing .xlsm is edited in place.
+    if (-not [string]::Equals([IO.Path]::GetExtension($workbookPath), ".xlsm", [StringComparison]::OrdinalIgnoreCase)) {
+        $finalPath = [IO.Path]::ChangeExtension($workbookPath, ".xlsm")
+        if (Test-Path -LiteralPath $finalPath) {
+            throw ("Рядом уже существует файл .xlsm: " + $finalPath + [Environment]::NewLine + "Чтобы не перезаписать его случайно, переименуйте его или выберите рабочую книгу с другим именем.")
+        }
+        $workbook.SaveAs($finalPath, 52)
+        Write-Host ("Рабочая книга преобразована в формат .xlsm: " + $finalPath)
     }
 
     try {
@@ -95,11 +84,7 @@ try {
         throw ("Excel заблокировал автоматическое добавление VBA-модулей. В Excel откройте Файл → Параметры → Центр управления безопасностью → Параметры центра управления безопасностью → Параметры макросов и включите «Доверять доступ к объектной модели проектов VBA». Затем закройте Excel и запустите установщик снова. Включайте эту настройку только если понимаете риск и доверяете исходникам проекта. Подробности: " + $_.Exception.Message)
     }
 
-    # Convert/save a separate macro-enabled copy before importing any code.
-    # The selected original is opened read-only and will be closed without saving.
-    $workbook.SaveAs($outputPath, 52)
-
-    # Replace only modules with the same names as the project modules to avoid duplicate components.
+    # Replace same-named project modules so repeated installation does not create duplicates.
     foreach ($name in $moduleFiles) {
         $moduleName = [IO.Path]::GetFileNameWithoutExtension($name)
         for ($i = $vbProject.VBComponents.Count; $i -ge 1; $i--) {
@@ -131,10 +116,9 @@ finally {
 
 if ($success) {
     Write-Host ""
-    Write-Host ("Готово: " + $outputPath) -ForegroundColor Green
-    Write-Host "Это отдельная копия выбранной книги: все листы, включая data, сохранены в ней."
-    Write-Host "Перечень будет формироваться в этой же копии, а не в отдельной книге результата."
-    Write-Host "Исходный файл не изменён. Откройте новую .xlsm-книгу и выполните Alt+F11 → Debug → Compile VBAProject."
+    Write-Host ("Готово. Макросы добавлены в рабочую книгу: " + $finalPath) -ForegroundColor Green
+    Write-Host "Лист data и остальные листы остались в этой же книге. Перечень будет создаваться в ней же."
+    Write-Host "Откройте эту .xlsm-книгу и выполните Alt+F11 → Debug → Compile VBAProject."
     Write-Host "Не запускайте макросы до успешной компиляции."
     Read-Host "Нажмите Enter для завершения"
 }
