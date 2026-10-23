@@ -163,6 +163,21 @@ if rename_module.exists():
         if fragment not in rename_source:
             errors.append(f'modRenameFiles.bas: reverse-order recovery logic missing: {fragment}')
 
+# Guard first-run cleanup: a failed setup must not leave a partially initialized result workbook open.
+context_module = root / 'src' / 'vba' / 'modWorkbookContext.bas'
+if context_module.exists():
+    context_source = context_module.read_text(encoding='utf-8-sig')
+    startup_guards = (
+        'failureNumber = Err.Number',
+        'failureDescription = Err.Description',
+        'If Not resultWb Is Nothing Then',
+        'resultWb.Close SaveChanges:=False',
+        'If resultWb Is gRegisterWorkbook Then Set gRegisterWorkbook = Nothing',
+    )
+    for fragment in startup_guards:
+        if fragment not in context_source:
+            errors.append(f'modWorkbookContext.bas: first-run cleanup guard missing: {fragment}')
+
 missing = sorted(x for x in required if x.lower() not in seen)
 if missing:
     errors.append('Missing required entry points: ' + ', '.join(missing))
