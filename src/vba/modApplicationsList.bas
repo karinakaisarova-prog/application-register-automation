@@ -599,7 +599,7 @@ Private Function IsSpecialDepartmentFile(ByVal fileNameOrNumber As String, ByVal
     Dim normalizedFile As String
     Set fso = CreateObject("Scripting.FileSystemObject")
     baseName = fso.GetBaseName(fileNameOrNumber)
-    normalizedFile = LCase$(Trim$(Replace(Replace(baseName, "_", " "), "ё", "е")))
+    normalizedFile = LCase$(Trim$(Replace(baseName, "ё", "е")))
 
     ' Match only exact base filenames, never a generic parsed title.
     IsSpecialDepartmentFile = (normalizedFile = "отчет 2 кв 2026" Or _
