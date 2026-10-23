@@ -121,6 +121,8 @@ if list_module.exists():
             errors.append('modApplicationsList.bas: GetObjectName must walk parent folders')
         if re.search(r'StrComp\(\s*folderPath\s*,\s*rootPath', object_code, re.I):
             errors.append('modApplicationsList.bas: GetObjectName must not stop at the selected root')
+        if 'Ёё' not in object_code:
+            errors.append('modApplicationsList.bas: object-name boundaries must treat Ё/ё as Cyrillic letters')
 
 readme = root / 'README.md'
 if readme.exists():
