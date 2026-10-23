@@ -324,6 +324,37 @@ if installer_path.exists():
         if fragment not in installer_source:
             errors.append('setup_excel.ps1: installer safety guard missing: ' + fragment)
 
+
+# Guard Word-document edits: a same-folder backup must be made before changes,
+# and a failed/cancelled edit must attempt restoration after closing Word.
+for module_name, function_prefix, log_prefix in (
+    ('modTableNumbering.bas', 'CreateWordBackupPath', 'LogTableBackup'),
+    ('modBulletListAudit.bas', 'CreateBulletBackupPath', 'LogBulletBackup'),
+):
+    module_path = root / 'src' / 'vba' / module_name
+    if module_path.exists():
+        module_source = module_path.read_text(encoding='utf-8-sig')
+        recovery_fragments = (
+            'backupPath = ' + function_prefix + '(reportPath)',
+            'FileCopy reportPath, backupPath',
+            'changesStarted = True',
+            'If changesStarted And Len(backupPath) > 0 Then',
+            'If Not wdDoc Is Nothing Then wdDoc.Close False',
+            'If Not wdApp Is Nothing Then wdApp.Quit',
+            'fsoRestore.CopyFile backupPath, reportPath, True',
+            'Автовосстановление не удалось. Резервная копия сохранена:',
+            'Application.EnableCancelKey = oldCancelKey',
+        )
+        for fragment in recovery_fragments:
+            if fragment not in module_source:
+                errors.append(f'{module_name}: Word backup/recovery guard missing: {fragment}')
+        backup_pos = module_source.find('FileCopy reportPath, backupPath')
+        change_pos = module_source.find('changesStarted = True', backup_pos)
+        first_edit_pos = module_source.find('EnsureTableCaptionLabel(wdDoc)') if module_name == 'modTableNumbering.bas' else module_source.find('wordRange.Delete')
+        if backup_pos < 0 or change_pos < backup_pos or first_edit_pos < 0 or backup_pos > first_edit_pos:
+            # Bullet list edit is inside a later loop; backup must precede its first deletion.
+            errors.append(f'{module_name}: backup must be created before document edits')
+
 print(f'Modules scanned: {len(modules)}; procedures/functions: {sum(len(x) for x in seen.values())}')
 if errors:
     print('\n'.join('ERROR: ' + x for x in errors))
