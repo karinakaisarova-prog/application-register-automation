@@ -63,10 +63,10 @@ Public Sub CheckAndFixWordBulletLists()
 
     ' Scan into a staging sheet so interruption cannot erase the previous report.
     On Error Resume Next
-    Set priorWs = ThisWorkbook.Worksheets(BULLET_REPORT_SHEET)
+    Set priorWs = GetRegisterWorkbook().Worksheets(BULLET_REPORT_SHEET)
     On Error GoTo Failed
     stageName = GetUniqueBulletAuditSheetName("_tmp_bullet_audit")
-    Set stageWs = ThisWorkbook.Worksheets.Add(After:=ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count))
+    Set stageWs = GetRegisterWorkbook().Worksheets.Add(After:=GetRegisterWorkbook().Worksheets(GetRegisterWorkbook().Worksheets.Count))
     stageWs.Name = stageName
     Set ws = stageWs
     ws.Range("A1:G1").Value = Array("Группа", "Страница", "Текст абзаца", "Найденная маркировка", _
@@ -318,7 +318,7 @@ End Function
 Private Function BulletAuditSheetExists(ByVal sheetName As String) As Boolean
     Dim probe As Worksheet
     On Error Resume Next
-    Set probe = ThisWorkbook.Worksheets(sheetName)
+    Set probe = GetRegisterWorkbook().Worksheets(sheetName)
     BulletAuditSheetExists = Not probe Is Nothing
     On Error GoTo 0
 End Function
@@ -400,10 +400,10 @@ End Function
 
 Private Function GetOrCreateBulletReportSheet(ByVal sheetName As String) As Worksheet
     On Error Resume Next
-    Set GetOrCreateBulletReportSheet = ThisWorkbook.Worksheets(sheetName)
+    Set GetOrCreateBulletReportSheet = GetRegisterWorkbook().Worksheets(sheetName)
     On Error GoTo 0
     If GetOrCreateBulletReportSheet Is Nothing Then
-        Set GetOrCreateBulletReportSheet = ThisWorkbook.Worksheets.Add(After:=ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count))
+        Set GetOrCreateBulletReportSheet = GetRegisterWorkbook().Worksheets.Add(After:=GetRegisterWorkbook().Worksheets(GetRegisterWorkbook().Worksheets.Count))
         GetOrCreateBulletReportSheet.Name = sheetName
     End If
 End Function
