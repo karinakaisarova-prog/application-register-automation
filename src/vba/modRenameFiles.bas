@@ -226,6 +226,7 @@ Public Sub RollbackLastRenameBatch()
     Dim reversedItems As Collection, item As Object, doneItem As Object
     Dim failure As String, recoveryError As String, itemPath As Variant
     Dim candidateOldPath As String, candidateNewPath As String
+    Dim recoveryIndex As Long
 
     oldScreen = Application.ScreenUpdating
     oldEvents = Application.EnableEvents
@@ -335,7 +336,9 @@ Failed:
     ' Best-effort recovery: restore files already renamed back to their post-rename paths.
     On Error Resume Next
     Application.EnableCancelKey = xlDisabled
-    For Each item In reversedItems
+    ' Reverse the rollback actions in reverse order to restore the pre-rollback state.
+    For recoveryIndex = reversedItems.Count To 1 Step -1
+        Set item = reversedItems(recoveryIndex)
         recoveryError = TryRenameFile(CStr(item("OldPath")), CStr(item("NewPath")))
         logRow = CLng(item("LogRow"))
         If Len(recoveryError) = 0 Then
@@ -352,7 +355,7 @@ Failed:
             failure = failure & vbCrLf & "Не удалось вернуть файл к новому имени: " & CStr(item("OldPath")) & _
                       " (" & recoveryError & ")"
         End If
-    Next item
+    Next recoveryIndex
     On Error GoTo 0
     MsgBox "Откат прерван. Макрос попытался вернуть уже обработанные файлы к состоянию до отката." & vbCrLf & _
            failure & vbCrLf & "Проверьте журнал переименования и фактические имена файлов.", vbExclamation
