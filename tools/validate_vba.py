@@ -134,6 +134,20 @@ if readme.exists():
         if phrase in readme_text:
             errors.append(f'README.md: outdated object-detection rule remains: {phrase}')
 
+# Guard mention-scanning behavior that is easy to regress:
+# common grammatical forms must be recognized and each match must use its own start page.
+analysis_module = root / 'src' / 'vba' / 'modReportAnalysis.bas'
+if analysis_module.exists():
+    analysis_source = analysis_module.read_text(encoding='utf-8-sig')
+    required_fragments = (
+        'приложение|приложения|приложению|приложением|приложении|приложений|прил',
+        'mt.FirstIndex',
+        'rng.Information(1)',
+    )
+    for fragment in required_fragments:
+        if fragment not in analysis_source:
+            errors.append(f'modReportAnalysis.bas: required mention-scanning logic missing: {fragment}')
+
 missing = sorted(x for x in required if x.lower() not in seen)
 if missing:
     errors.append('Missing required entry points: ' + ', '.join(missing))
