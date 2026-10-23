@@ -37,6 +37,10 @@ Public Sub CheckAndNumberWordTables()
     Dim fsoRestore As Object
     Dim oldStatusBar As Variant
     Dim oldCancelKey As XlEnableCancelKey
+    Dim priorWs As Worksheet
+    Dim stageWs As Worksheet
+    Dim stageName As String, priorBackupName As String
+    Dim reportCommitted As Boolean, priorRenamed As Boolean
 
     If GetRegisterWorkbook() Is Nothing Then
         MsgBox "Сначала запустите StartRegisterAutomation, чтобы создать книгу результата.", vbExclamation, "Книга результата не найдена"
@@ -68,8 +72,15 @@ Public Sub CheckAndNumberWordTables()
     wdApp.Visible = False
     Set wdDoc = wdApp.Documents.Open(reportPath, False, False, False)
 
-    Set ws = GetOrCreateTableReportSheet(TABLE_REPORT_SHEET)
-    ws.Cells.Clear
+    ' Build the new report on a temporary sheet. Keep the previous report intact
+    ' until the scan has completed successfully.
+    On Error Resume Next
+    Set priorWs = GetRegisterWorkbook().Worksheets(TABLE_REPORT_SHEET)
+    On Error GoTo Failed
+    stageName = GetUniqueTableAuditSheetName("_tmp_table_audit")
+    Set stageWs = GetRegisterWorkbook().Worksheets.Add(After:=GetRegisterWorkbook().Worksheets(GetRegisterWorkbook().Worksheets.Count))
+    stageWs.Name = stageName
+    Set ws = stageWs
     ws.Range("A1:G1").Value = Array("№ таблицы", "Страница", "Подпись перед таблицей", _
                                     "Поле SEQ «Таблица»", "Результат проверки", "Путь к отчёту", "Индекс таблицы")
     r = FIRST_DATA_ROW
@@ -101,6 +112,25 @@ Public Sub CheckAndNumberWordTables()
     Next tbl
 
     FormatTableReport ws, r - 1
+
+    ' Commit only after the scan and formatting are complete.
+    If Not priorWs Is Nothing Then
+        priorBackupName = GetUniqueTableAuditSheetName("_bak_table_audit")
+        priorWs.Name = priorBackupName
+        priorRenamed = True
+    End If
+    On Error GoTo CommitFailed
+    ws.Name = TABLE_REPORT_SHEET
+    reportCommitted = True
+    Set stageWs = Nothing
+    If priorRenamed Then
+        Application.DisplayAlerts = False
+        priorWs.Delete
+        Set priorWs = Nothing
+        priorRenamed = False
+    End If
+    Application.DisplayAlerts = oldAlerts
+    On Error GoTo Failed
     ws.Activate
 
     If tableCount = 0 Then
@@ -184,12 +214,38 @@ Public Sub CheckAndNumberWordTables()
            vbInformation, "Нумерация таблиц"
     GoTo CleanExit
 
+CommitFailed:
+    errText = Err.Description
+    On Error Resume Next
+    If priorRenamed And Not priorWs Is Nothing Then
+        If Not reportCommitted Then priorWs.Name = TABLE_REPORT_SHEET
+    End If
+    If Not stageWs Is Nothing Then
+        If Not reportCommitted Then
+            Application.DisplayAlerts = False
+            stageWs.Delete
+        End If
+    End If
+    Application.DisplayAlerts = oldAlerts
+    Err.Clear
+    On Error GoTo Failed
+
 Failed:
     cancelled = (Err.Number = 18)
     errText = Err.Description
     On Error Resume Next
     If Not wdDoc Is Nothing Then wdDoc.Close False
     If Not wdApp Is Nothing Then wdApp.Quit
+    If Not stageWs Is Nothing Then
+        If Not reportCommitted Then
+            Application.DisplayAlerts = False
+            stageWs.Delete
+        End If
+    End If
+    If priorRenamed And Not priorWs Is Nothing And Not reportCommitted Then
+        priorWs.Name = TABLE_REPORT_SHEET
+    End If
+    Application.DisplayAlerts = oldAlerts
     If changesStarted And Len(backupPath) > 0 Then
         Err.Clear
         Set fsoRestore = CreateObject("Scripting.FileSystemObject")
@@ -391,14 +447,24 @@ Private Sub UpdateAllStoryFields(ByVal wdDoc As Object)
     On Error GoTo 0
 End Sub
 
-Private Function GetOrCreateTableReportSheet(ByVal sheetName As String) As Worksheet
+Private Function GetUniqueTableAuditSheetName(ByVal baseName As String) As String
+    Dim candidate As String
+    Dim suffix As Long
+    candidate = Left$(baseName, 31)
+    suffix = 1
+    Do While TableAuditSheetExists(candidate)
+        candidate = Left$(baseName, 27) & "_" & CStr(suffix)
+        suffix = suffix + 1
+    Loop
+    GetUniqueTableAuditSheetName = candidate
+End Function
+
+Private Function TableAuditSheetExists(ByVal sheetName As String) As Boolean
+    Dim probe As Worksheet
     On Error Resume Next
-    Set GetOrCreateTableReportSheet = GetRegisterWorkbook().Worksheets(sheetName)
+    Set probe = GetRegisterWorkbook().Worksheets(sheetName)
+    TableAuditSheetExists = Not probe Is Nothing
     On Error GoTo 0
-    If GetOrCreateTableReportSheet Is Nothing Then
-        Set GetOrCreateTableReportSheet = GetRegisterWorkbook().Worksheets.Add(After:=GetRegisterWorkbook().Worksheets(GetRegisterWorkbook().Worksheets.Count))
-        GetOrCreateTableReportSheet.Name = sheetName
-    End If
 End Function
 
 Private Sub FormatTableReport(ByVal ws As Worksheet, ByVal lastRow As Long)
