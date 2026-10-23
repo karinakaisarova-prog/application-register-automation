@@ -46,6 +46,7 @@ $workbook = $null
 $success = $false
 $finalPath = $workbookPath
 $backupPath = $null
+$convertedOutputCreated = $false
 
 # Preserve the selected workbook before any Excel automation or format conversion.
 try {
@@ -95,6 +96,9 @@ try {
         if (Test-Path -LiteralPath $finalPath) {
             throw ("Рядом уже существует файл .xlsm: " + $finalPath + [Environment]::NewLine + "Чтобы не перезаписать его случайно, переименуйте его или выберите рабочую книгу с другим именем.")
         }
+        # The destination did not exist above. Mark it for cleanup before SaveAs
+        # so a partial conversion is removed if SaveAs or module import fails.
+        $convertedOutputCreated = $true
         $workbook.SaveAs($finalPath, 52)
         Write-Host ("Рабочая книга преобразована в формат .xlsm: " + $finalPath)
     }
@@ -122,6 +126,19 @@ finally {
     }
     if ($excel -ne $null) {
         try { $excel.Quit() } catch {}
+    }
+    if (-not $success -and $convertedOutputCreated -and $finalPath -ne $workbookPath) {
+        # Remove only the new .xlsm destination, never the selected original file.
+        # The original workbook and its pre-install backup are retained.
+        try {
+            if (Test-Path -LiteralPath $finalPath -PathType Leaf) {
+                Remove-Item -LiteralPath $finalPath -Force -ErrorAction Stop
+                Write-Host ("Удалена неполная .xlsm-копия после неудачной установки: " + $finalPath)
+            }
+        }
+        catch {
+            Write-Warning ("Не удалось удалить неполную .xlsm-копию. Проверьте файл вручную: " + $finalPath + ". " + $_.Exception.Message)
+        }
     }
     if ($workbook -ne $null) { try { [void][Runtime.InteropServices.Marshal]::ReleaseComObject($workbook) } catch {} }
     if ($excel -ne $null) { try { [void][Runtime.InteropServices.Marshal]::ReleaseComObject($excel) } catch {} }
