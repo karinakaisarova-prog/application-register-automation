@@ -298,6 +298,7 @@ Public Sub CountPagesForRegister()
                     GoTo NextRow
                 Case Else
                     ws.Cells(r, 10).Value = "Неподдерживаемый формат"
+                    failed = failed + 1
                     GoTo NextRow
             End Select
             ws.Cells(r, 10).Value = pages
