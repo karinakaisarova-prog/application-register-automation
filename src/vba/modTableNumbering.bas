@@ -11,6 +11,7 @@ Private Const FIRST_DATA_ROW As Long = 2
 Private Const WD_STATISTIC_PAGES As Long = 2
 Private Const WD_CAPTION_POSITION_ABOVE As Long = 0
 Private Const WD_FIELD_SEQUENCE As Long = 12
+Private Const WD_WITHIN_TABLE As Long = 12
 
 Public Sub CheckAndNumberWordTables()
    Dim fd As FileDialog
@@ -22,6 +23,7 @@ Public Sub CheckAndNumberWordTables()
     Dim r As Long
     Dim tableCount As Long
     Dim missingCount As Long
+    Dim manualCaptionCount As Long
     Dim insertedCount As Long
     Dim pageNo As Long
     Dim captionText As String
@@ -102,6 +104,9 @@ Public Sub CheckAndNumberWordTables()
         ws.Cells(r, 4).Value = IIf(hasSeq, "Да", "Нет")
         If hasSeq Then
             ws.Cells(r, 5).Value = "Нумерация найдена"
+        ElseIf IsTableCaptionText(captionText) Then
+            ws.Cells(r, 5).Value = "Текстовая подпись без SEQ — ручная проверка"
+            manualCaptionCount = manualCaptionCount + 1
         Else
             ws.Cells(r, 5).Value = "Требуется добавить подпись"
             missingCount = missingCount + 1
@@ -139,17 +144,27 @@ Public Sub CheckAndNumberWordTables()
     End If
 
     If missingCount = 0 Then
-        MsgBox "Проверка завершена. Найдено таблиц: " & tableCount & _
-               vbCrLf & "У всех таблиц найдены подписи с полем SEQ «Таблица»." & _
-               vbCrLf & "Отчёт проверки записан на лист '" & TABLE_REPORT_SHEET & "'.", _
-               vbInformation, "Проверка таблиц"
+        If manualCaptionCount > 0 Then
+            MsgBox "Проверка завершена. Таблиц: " & tableCount & _
+                   vbCrLf & "Текстовых подписей без поля SEQ: " & manualCaptionCount & _
+                   vbCrLf & "Эти подписи не изменены автоматически, чтобы не создавать дубликаты. Проверьте их вручную." & _
+                   vbCrLf & "Отчёт проверки записан на лист '" & TABLE_REPORT_SHEET & "'.", _
+                   vbExclamation, "Проверка таблиц"
+        Else
+            MsgBox "Проверка завершена. Найдено таблиц: " & tableCount & _
+                   vbCrLf & "У всех таблиц найдены подписи с полем SEQ «Таблица»." & _
+                   vbCrLf & "Отчёт проверки записан на лист '" & TABLE_REPORT_SHEET & "'.", _
+                   vbInformation, "Проверка таблиц"
+        End If
         GoTo CleanExit
     End If
 
     answer = MsgBox("Предварительная проверка завершена." & vbCrLf & _
                     "Всего таблиц: " & tableCount & vbCrLf & _
-                    "Таблиц без поля SEQ «Таблица»: " & missingCount & vbCrLf & vbCrLf & _
-                    "Добавить подписи над таблицами без нумерации, обновить поля документа и сохранить Word-отчёт?" & _
+                    "Таблиц без подписи: " & missingCount & vbCrLf & _
+                    "Текстовых подписей без SEQ (будут пропущены): " & manualCaptionCount & vbCrLf & vbCrLf & _
+                    "Добавить подписи только таблицам без подписи, обновить поля и сохранить Word-отчёт?" & _
+                    vbCrLf & "Текстовые подписи без SEQ автоматически не заменяются, чтобы избежать дубликатов." & _
                     vbCrLf & "Перед изменением рекомендуется иметь резервную копию.", _
                     vbYesNo + vbQuestion + vbDefaultButton2, "Подтверждение нумерации")
     If answer <> vbYes Then
@@ -170,7 +185,9 @@ Public Sub CheckAndNumberWordTables()
     For r = tableCount To 1 Step -1
         DoEvents
         Set tbl = wdDoc.Tables(r)
-        If Not HasTableSequenceField(wdDoc, tbl.Range.Start) Then
+        captionText = GetPreviousCaptionText(wdDoc, tbl.Range.Start)
+        If Not HasTableSequenceField(wdDoc, tbl.Range.Start) And _
+           Not IsTableCaptionText(captionText) Then
             InsertCustomTableCaption wdApp, wdDoc, tbl
             insertedCount = insertedCount + 1
             Application.StatusBar = "Добавление подписей: " & insertedCount & " из " & missingCount
@@ -199,7 +216,13 @@ Public Sub CheckAndNumberWordTables()
         ws.Cells(r, 2).Value = pageNo
         ws.Cells(r, 3).Value = captionText
         ws.Cells(r, 4).Value = IIf(hasSeq, "Да", "Нет")
-        ws.Cells(r, 5).Value = IIf(hasSeq, "Нумерация найдена", "Проверьте вручную")
+        If hasSeq Then
+            ws.Cells(r, 5).Value = "Нумерация найдена"
+        ElseIf IsTableCaptionText(captionText) Then
+            ws.Cells(r, 5).Value = "Подпись без SEQ — проверьте вручную"
+        Else
+            ws.Cells(r, 5).Value = "Проверьте вручную"
+        End If
         ws.Cells(r, 6).Value = reportPath
         ws.Cells(r, 7).Value = r - FIRST_DATA_ROW + 1
         r = r + 1
@@ -413,21 +436,38 @@ Private Function HasTableSequenceField(ByVal wdDoc As Object, ByVal tableStart A
 End Function
 
 Private Function GetPreviousCaptionText(ByVal wdDoc As Object, ByVal tableStart As Long) As String
-    Dim probe As Object
+    Dim paraIndex As Long
+    Dim checkedParagraphs As Long
     Dim para As Object
     Dim txt As String
 
-    On Error Resume Next
     If tableStart <= 0 Then Exit Function
-    Set probe = wdDoc.Range(0, tableStart)
-    Set para = probe.Paragraphs.Last.Range
-    If Not para Is Nothing Then
-        txt = CStr(para.Text)
-        txt = Replace(txt, vbCr, "")
-        txt = Replace(txt, Chr$(7), "")
-        GetPreviousCaptionText = Trim$(txt)
-    End If
-    On Error GoTo 0
+    For paraIndex = wdDoc.Paragraphs.Count To 1 Step -1
+        Set para = wdDoc.Paragraphs(paraIndex).Range
+        If para.Start >= tableStart Then
+            ' Skip paragraphs at or inside the current table.
+        ElseIf para.End <= tableStart Then
+            If para.Information(WD_WITHIN_TABLE) = False Then
+                checkedParagraphs = checkedParagraphs + 1
+                txt = CStr(para.Text)
+                txt = Replace(txt, vbCr, "")
+                txt = Replace(txt, Chr$(7), "")
+                txt = Replace(txt, ChrW(160), " ")
+                If Len(Trim$(txt)) > 0 Then
+                    GetPreviousCaptionText = Trim$(txt)
+                    Exit Function
+                End If
+                If checkedParagraphs >= 4 Then Exit For
+            End If
+        End If
+    Next paraIndex
+End Function
+
+Private Function IsTableCaptionText(ByVal captionText As String) As Boolean
+    captionText = Replace(captionText, ChrW(160), " ")
+    captionText = Trim$(captionText)
+    If Len(captionText) < Len("Таблица") Then Exit Function
+    IsTableCaptionText = (StrComp(Left$(captionText, Len("Таблица")), "Таблица", vbTextCompare) = 0)
 End Function
 
 Private Sub EnsureTableCaptionLabel(ByVal wdDoc As Object)
