@@ -25,6 +25,7 @@ Public Sub RenameFilesFromRegister()
     Dim oldCancelKey As XlEnableCancelKey
     Dim renamedItems As Collection
     Dim rollbackItem As Variant
+    Dim rollbackIndex As Long
     Dim rollbackError As String
 
     oldScreen = Application.ScreenUpdating
@@ -167,7 +168,9 @@ Failed:
     ' If a batch was interrupted, reverse every rename completed in this run.
     On Error Resume Next
     If Not renamedItems Is Nothing Then
-        For Each rollbackItem In renamedItems
+        ' Undo in reverse order, like a transaction stack.
+        For rollbackIndex = renamedItems.Count To 1 Step -1
+            Set rollbackItem = renamedItems(rollbackIndex)
             rollbackError = TryRenameFile(CStr(rollbackItem("NewPath")), CStr(rollbackItem("OldPath")))
             If Len(rollbackError) = 0 Then
                 If Not ws Is Nothing Then
@@ -198,7 +201,7 @@ Failed:
                     Next r
                 End If
             End If
-        Next rollbackItem
+        Next rollbackIndex
     End If
     On Error GoTo 0
     MsgBox failure & vbCrLf & _
