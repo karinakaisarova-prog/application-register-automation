@@ -352,20 +352,19 @@ End Function
 Private Function GetObjectName(ByVal rootPath As String, ByVal currentPath As String, ByVal fileName As String) As String
     Dim fso As Object
     Dim folderPath As String
+    Dim parentPath As String
     Dim folderName As String
     Dim candidate As String
     Dim objectNames As Variant
-    Dim i As Long
 
     ' Keep the six approved object labels in one place.
     objectNames = Array("КЗТ", "СМТ", "АМТ", "Саратов", "НТУ", "КТ")
     Set fso = CreateObject("Scripting.FileSystemObject")
-    rootPath = RemoveTrailingSlash(rootPath)
     folderPath = RemoveTrailingSlash(currentPath)
 
-    ' Search only inside the selected root: current folder first, then its
-    ' parents up to and including that root. Never inherit an object label
-    ' from an unrelated folder above the selected directory.
+    ' Per requirements, inspect the complete folder path: start with the
+    ' file's nearest folder and continue through every parent, including
+    ' parents above the selected root. The nearest matching folder wins.
     Do While Len(folderPath) > 0
         folderName = GetFolderName(folderPath)
         candidate = FindObjectInText(folderName, objectNames)
@@ -374,12 +373,13 @@ Private Function GetObjectName(ByVal rootPath As String, ByVal currentPath As St
             Exit Function
         End If
 
-        If StrComp(folderPath, rootPath, vbTextCompare) = 0 Then Exit Do
-        folderPath = fso.GetParentFolderName(folderPath)
+        parentPath = fso.GetParentFolderName(folderPath)
+        If Len(parentPath) = 0 Or StrComp(parentPath, folderPath, vbTextCompare) = 0 Then Exit Do
+        folderPath = RemoveTrailingSlash(parentPath)
     Loop
 
-    ' Only if no approved object was found in the selected root's folder
-    ' hierarchy, check the file name.
+    ' Only if no approved object was found in any folder of the full path,
+    ' inspect the filename. Do not guess if it also has no approved label.
     GetObjectName = FindObjectInText(fileName, objectNames)
 End Function
 
