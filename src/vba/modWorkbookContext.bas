@@ -81,10 +81,8 @@ Public Function GetRegisterWorkbook() As Workbook
         Next ws
     Next wb
 
-    If Not ActiveWorkbook Is Nothing Then
-        Set gRegisterWorkbook = ActiveWorkbook
-        Set GetRegisterWorkbook = ActiveWorkbook
-    End If
+    ' Do not silently fall back to the macro-host workbook: that could overwrite or
+    ' create result sheets in the wrong file. Callers must handle Nothing safely.
 End Function
 
 
