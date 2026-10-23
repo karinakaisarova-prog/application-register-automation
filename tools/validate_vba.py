@@ -104,6 +104,46 @@ for name, entries in seen.items():
             ', '.join(f'{p.relative_to(root)}:{n}' for p, n, _ in entries)
         )
 
+# Guard a critical project requirement: object detection must walk the full
+# folder chain, including parents above the selected root, before checking the filename.
+list_module = root / 'src' / 'vba' / 'modApplicationsList.bas'
+if list_module.exists():
+    source = list_module.read_text(encoding='utf-8-sig')
+    object_match = re.search(
+        r'Private Function GetObjectName\\b(.*?)^End Function\\s*if missing:
+    errors.append('Missing required entry points: ' + ', '.join(missing))
+
+print(f'Modules scanned: {len(modules)}; procedures/functions: {sum(len(x) for x in seen.values())}')
+if errors:
+    print('\n'.join('ERROR: ' + x for x in errors))
+    sys.exit(1)
+
+print('PASS: no duplicate procedure names, unmatched procedure endings, or unresolved GoTo labels; required entry points found.')
+print('NOTE: this is static validation, not VBA compilation or Excel/Word runtime testing.')
+,
+        source, re.I | re.M | re.S
+    )
+    if not object_match:
+        errors.append('modApplicationsList.bas: GetObjectName function not found')
+    else:
+        object_code = object_match.group(1)
+        if 'fso.GetParentFolderName(folderPath)' not in object_code:
+            errors.append('modApplicationsList.bas: GetObjectName must walk parent folders')
+        if re.search(r'StrComp\\(\\s*folderPath\\s*,\\s*rootPath', object_code, re.I):
+            errors.append('modApplicationsList.bas: GetObjectName must not stop at the selected root')
+
+readme = root / 'README.md'
+if readme.exists():
+    readme_text = readme.read_text(encoding='utf-8-sig').lower()
+    contradictory_phrases = (
+        'внешние родительские папки выше корня не используются',
+        'код из внешней папки выше выбранного корня не используется',
+        'only inside the selected root',
+    )
+    for phrase in contradictory_phrases:
+        if phrase in readme_text:
+            errors.append(f'README.md: outdated object-detection rule remains: {phrase}')
+
 missing = sorted(x for x in required if x.lower() not in seen)
 if missing:
     errors.append('Missing required entry points: ' + ', '.join(missing))
