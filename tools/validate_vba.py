@@ -139,6 +139,9 @@ if list_module.exists():
             errors.append('modApplicationsList.bas: special-file matching must preserve underscores for exact base-name checks')
         if 'Replace(baseName, "_", " ")' in special_code:
             errors.append('modApplicationsList.bas: special-file matching must not normalize underscores into spaces')
+        for exact_name in ('отчет 2 кв 2026', 'реестр рисков'):
+            if exact_name not in special_code:
+                errors.append('modApplicationsList.bas: exact special-file name missing: ' + exact_name)
 
 readme = root / 'README.md'
 if readme.exists():
