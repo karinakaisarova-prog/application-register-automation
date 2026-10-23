@@ -100,9 +100,7 @@ Public Sub ScanWordReportMentions()
         paraText = Replace(paraText, Chr$(7), "")
         If rx.Test(paraText) Then
             Set matches = rx.Execute(paraText)
-            pageNo = 0
             On Error Resume Next
-            pageNo = para.Range.Information(3) ' wdActiveEndPageNumber
             outlineLevel = para.OutlineLevel
             If Err.Number <> 0 Then
                 Err.Clear
@@ -111,6 +109,11 @@ Public Sub ScanWordReportMentions()
             On Error GoTo Failed
 
             For Each mt In matches
+                ' Resolve the page from the exact match range, not the paragraph
+                ' end: one long paragraph can contain mentions on different pages.
+                Set rng = wdDoc.Range(para.Range.Start + CLng(mt.FirstIndex), _
+                                      para.Range.Start + CLng(mt.FirstIndex) + CLng(mt.Length))
+                pageNo = CLng(rng.Information(3)) ' wdActiveEndPageNumber
                 ws.Cells(rowOut, 1).Value = rowOut - FIRST_RESULT_ROW + 1
                 ws.Cells(rowOut, 2).Value = mt.Value
                 ws.Cells(rowOut, 3).Value = pageNo
