@@ -332,12 +332,13 @@ bullet_module = root / 'src' / 'vba' / 'modBulletListAudit.bas'
 if bullet_module.exists():
     bullet_source = bullet_module.read_text(encoding='utf-8-sig')
     for fragment in (
-        'GetBulletIndentLevel(txt)',
+        'GetBulletIndentLevel(para, txt)',
         'If currentIndent <> runIndent Then unsafeGroup = True',
         'If unsafeGroup Then unsafeGroupsFound = unsafeGroupsFound + 1',
         'If unsafeGroupsFound > 0 Then',
         'Автоматическое исправление не выполнено, чтобы не потерять структуру вложенности.',
-        'Private Function GetBulletIndentLevel(ByVal paragraphText As String) As Long',
+        'Private Function GetBulletIndentLevel(ByVal para As Object, ByVal paragraphText As String) As Double',
+        'GetBulletIndentLevel = CDbl(para.Format.LeftIndent)',
     ):
         if fragment not in bullet_source:
             errors.append('modBulletListAudit.bas: nested-list safety guard missing: ' + fragment)
