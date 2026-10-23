@@ -169,33 +169,7 @@ table_module = root / 'src' / 'vba' / 'modTableNumbering.bas'
 if table_module.exists():
     table_source = table_module.read_text(encoding='utf-8-sig')
     caption_match = re.search(
-        r'Private Function HasTableSequenceField\b(.*?)^End Function\s*
-context_module = root / 'src' / 'vba' / 'modWorkbookContext.bas'
-if context_module.exists():
-    context_source = context_module.read_text(encoding='utf-8-sig')
-    startup_guards = (
-        'failureNumber = Err.Number',
-        'failureDescription = Err.Description',
-        'If Not resultWb Is Nothing Then',
-        'resultWb.Close SaveChanges:=False',
-        'If resultWb Is gRegisterWorkbook Then Set gRegisterWorkbook = Nothing',
-    )
-    for fragment in startup_guards:
-        if fragment not in context_source:
-            errors.append(f'modWorkbookContext.bas: first-run cleanup guard missing: {fragment}')
-
-missing = sorted(x for x in required if x.lower() not in seen)
-if missing:
-    errors.append('Missing required entry points: ' + ', '.join(missing))
-
-print(f'Modules scanned: {len(modules)}; procedures/functions: {sum(len(x) for x in seen.values())}')
-if errors:
-    print('\n'.join('ERROR: ' + x for x in errors))
-    sys.exit(1)
-
-print('PASS: no duplicate procedure names, unmatched procedure endings, or unresolved GoTo labels; required entry points found.')
-print('NOTE: this is static validation, not VBA compilation or Excel/Word runtime testing.')
-,
+        r'Private Function HasTableSequenceField\b(.*?)^End Function\s*$',
         table_source, re.I | re.M | re.S
     )
     if not caption_match:
