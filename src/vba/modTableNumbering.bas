@@ -376,29 +376,37 @@ Private Function HasTableSequenceField(ByVal wdDoc As Object, ByVal tableStart A
     Dim fld As Object
     Dim codeText As String
     Dim paraText As String
+    Dim trimmedText As String
 
-    ' Search up to four actual paragraphs before the table (not four characters).
-    ' Stop at the first non-empty paragraph so an unrelated earlier SEQ field
-    ' cannot make this table appear to have a caption.
+    ' Skip a few empty paragraphs, then inspect only the nearest non-empty
+    ' paragraph. A SEQ field alone is not enough: it must be in a caption-like
+    ' paragraph beginning with the visible label "Таблица".
     For paraIndex = wdDoc.Paragraphs.Count To 1 Step -1
         Set para = wdDoc.Paragraphs(paraIndex).Range
         If para.Start >= tableStart Then
             ' Paragraph is at or inside the table; skip it.
         ElseIf para.End <= tableStart Then
             checkedParagraphs = checkedParagraphs + 1
-            For Each fld In para.Fields
-                codeText = UCase$(Trim$(CStr(fld.Code.Text)))
-                If InStr(1, codeText, "SEQ", vbTextCompare) > 0 And _
-                   InStr(1, codeText, "ТАБЛИЦА", vbTextCompare) > 0 Then
-                    HasTableSequenceField = True
-                    Exit Function
-                End If
-            Next fld
-
             paraText = CStr(para.Text)
             paraText = Replace(paraText, vbCr, "")
             paraText = Replace(paraText, Chr$(7), "")
-            If Len(Trim$(paraText)) > 0 Then Exit For
+            paraText = Replace(paraText, ChrW(160), " ")
+            trimmedText = Trim$(paraText)
+
+            If Len(trimmedText) > 0 Then
+                If StrComp(Left$(trimmedText, Len("Таблица")), "Таблица", vbTextCompare) = 0 Then
+                    For Each fld In para.Fields
+                        codeText = Trim$(CStr(fld.Code.Text))
+                        If InStr(1, codeText, "SEQ", vbTextCompare) > 0 And _
+                           InStr(1, codeText, "ТАБЛИЦА", vbTextCompare) > 0 Then
+                            HasTableSequenceField = True
+                            Exit Function
+                        End If
+                    Next fld
+                End If
+                Exit For
+            End If
+
             If checkedParagraphs >= 4 Then Exit For
         End If
     Next paraIndex
