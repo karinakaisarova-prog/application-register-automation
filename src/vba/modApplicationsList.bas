@@ -116,6 +116,7 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
     ApplyLookups ws
     ws.Columns(TEMP_SORT_COL).Hidden = True
     ws.Activate
+    CreateRegisterControlPanel ws
     If Not backupWs Is Nothing Then
         Application.DisplayAlerts = False
         backupWs.Delete
