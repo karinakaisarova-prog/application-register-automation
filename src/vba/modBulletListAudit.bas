@@ -27,6 +27,8 @@ Public Sub CheckAndFixWordBulletLists()
     Dim cancelled As Boolean
     Dim answer As VbMsgBoxResult
     Dim groupsFound As Long, paragraphsFound As Long, paragraphsFixed As Long
+    Dim runIndent As Long, currentIndent As Long, unsafeGroupsFound As Long
+    Dim unsafeGroup As Boolean
     Dim backupPath As String
     Dim changesStarted As Boolean
     Dim fsoRestore As Object
@@ -90,6 +92,8 @@ Public Sub CheckAndFixWordBulletLists()
         If Not IsNativeWordList(para) Then
             If GetTypedMarker(txt, markerOffset, markerLength) Then
                 runStart = i
+                unsafeGroup = False
+                runIndent = GetBulletIndentLevel(txt)
                 j = i
                 Do While j <= pCount
                     Set para = wdDoc.Paragraphs(j)
@@ -98,6 +102,8 @@ Public Sub CheckAndFixWordBulletLists()
                     markerLength = 0
                     If IsNativeWordList(para) Then Exit Do
                     If Not GetTypedMarker(txt, markerOffset, markerLength) Then Exit Do
+                    currentIndent = GetBulletIndentLevel(txt)
+                    If currentIndent <> runIndent Then unsafeGroup = True
                     j = j + 1
                 Loop
                 runEnd = j - 1
@@ -105,6 +111,7 @@ Public Sub CheckAndFixWordBulletLists()
 
                 ' Avoid converting isolated dash-led paragraphs: they may be ordinary prose.
                 If runLength >= 2 Then
+                    If unsafeGroup Then unsafeGroupsFound = unsafeGroupsFound + 1
                     groupNo = groupNo + 1
                     groupsFound = groupsFound + 1
                     For i = runStart To runEnd
@@ -158,6 +165,14 @@ Public Sub CheckAndFixWordBulletLists()
     Application.DisplayAlerts = oldAlerts
     On Error GoTo Failed
     ws.Activate
+
+    If unsafeGroupsFound > 0 Then
+        MsgBox "Найдены группы ручных маркеров с разными отступами (возможные вложенные пункты): " & unsafeGroupsFound & _
+               vbCrLf & "Отчёт сохранён на листе '" & BULLET_REPORT_SHEET & "'. Автоматическое исправление не выполнено, чтобы не потерять структуру вложенности." & _
+               vbCrLf & "Проверьте эти группы вручную и запустите макрос повторно после подготовки документа.", _
+               vbExclamation, "Требуется ручная проверка вложенных списков"
+        GoTo CleanExit
+    End If
 
     If paragraphsFound = 0 Then
         MsgBox "Не найдено групп из двух или более подряд идущих абзацев с ручными маркерами, которые можно уверенно преобразовать." & _
@@ -385,6 +400,23 @@ Private Function GetTypedMarker(ByVal paragraphText As String, ByRef markerOffse
     Loop
     markerLength = i - (markerOffset + 1)
     GetTypedMarker = True
+End Function
+
+Private Function GetBulletIndentLevel(ByVal paragraphText As String) As Long
+    Dim i As Long
+    Dim ch As String
+    paragraphText = Replace(paragraphText, vbCr, "")
+    paragraphText = Replace(paragraphText, Chr$(7), "")
+    For i = 1 To Len(paragraphText)
+        ch = Mid$(paragraphText, i, 1)
+        If ch = " " Then
+            GetBulletIndentLevel = GetBulletIndentLevel + 1
+        ElseIf ch = vbTab Then
+            GetBulletIndentLevel = GetBulletIndentLevel + 4
+        Else
+            Exit For
+        End If
+    Next i
 End Function
 
 Private Function IsNativeWordList(ByVal para As Object) As Boolean
