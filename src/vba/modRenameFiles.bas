@@ -166,7 +166,10 @@ Failed:
     failure = Err.Description
     If Err.Number = 18 Then failure = "Операция отменена пользователем (Ctrl+Break)."
     ' If a batch was interrupted, reverse every rename completed in this run.
+    ' Disable another Ctrl+Break while recovery is in progress; otherwise a second
+    ' interruption could stop the rollback halfway through.
     On Error Resume Next
+    Application.EnableCancelKey = xlDisabled
     If Not renamedItems Is Nothing Then
         ' Undo in reverse order, like a transaction stack.
         For rollbackIndex = renamedItems.Count To 1 Step -1
