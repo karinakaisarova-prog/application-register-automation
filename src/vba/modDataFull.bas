@@ -72,13 +72,13 @@ Public Sub BuildDataFull()
     Next r
 
     On Error Resume Next
-    Set outputWs = ThisWorkbook.Worksheets(OUTPUT_SHEET)
+    Set outputWs = GetRegisterWorkbook().Worksheets(OUTPUT_SHEET)
     On Error GoTo Failed
     outputWasExisting = Not outputWs Is Nothing
 
     ' Keep a full worksheet copy until the rebuild has completed successfully.
     If outputWasExisting Then
-        outputWs.Copy After:=ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count)
+        outputWs.Copy After:=GetRegisterWorkbook().Worksheets(GetRegisterWorkbook().Worksheets.Count)
         Set backupWs = ActiveSheet
         backupWs.Name = GetUniqueDataFullBackupName()
     Else
@@ -203,10 +203,10 @@ End Sub
 
 Private Function GetOrCreateDataFullSheet() As Worksheet
     On Error Resume Next
-    Set GetOrCreateDataFullSheet = ThisWorkbook.Worksheets(OUTPUT_SHEET)
+    Set GetOrCreateDataFullSheet = GetRegisterWorkbook().Worksheets(OUTPUT_SHEET)
     On Error GoTo 0
     If GetOrCreateDataFullSheet Is Nothing Then
-        Set GetOrCreateDataFullSheet = ThisWorkbook.Worksheets.Add(After:=ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count))
+        Set GetOrCreateDataFullSheet = GetRegisterWorkbook().Worksheets.Add(After:=GetRegisterWorkbook().Worksheets(GetRegisterWorkbook().Worksheets.Count))
         GetOrCreateDataFullSheet.Name = OUTPUT_SHEET
     End If
 End Function
@@ -226,7 +226,7 @@ End Function
 Private Function DataFullWorksheetExists(ByVal sheetName As String) As Boolean
     Dim ws As Worksheet
     On Error Resume Next
-    Set ws = ThisWorkbook.Worksheets(sheetName)
+    Set ws = GetRegisterWorkbook().Worksheets(sheetName)
     DataFullWorksheetExists = Not ws Is Nothing
     On Error GoTo 0
 End Function
@@ -243,7 +243,7 @@ Private Function GetUniqueDataFullBackupName() As String
     suffix = 1
     Do
         exists = False
-        For Each ws In ThisWorkbook.Worksheets
+        For Each ws In GetRegisterWorkbook().Worksheets
             If StrComp(ws.Name, candidate, vbTextCompare) = 0 Then
                 exists = True
                 Exit For
