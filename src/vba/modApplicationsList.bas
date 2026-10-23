@@ -76,7 +76,7 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
     Set mSections = CreateObject("Scripting.Dictionary")
     mSections.CompareMode = vbTextCompare
     On Error Resume Next
-    Set ws = ThisWorkbook.Worksheets(sheetName)
+    Set ws = GetRegisterWorkbook().Worksheets(sheetName)
     On Error GoTo Failed
     targetWasExisting = Not ws Is Nothing
     originalSheetName = sheetName
@@ -84,8 +84,8 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
         SaveExistingSections ws, mSections
         ' Keep a worksheet-level recovery copy before any destructive rebuild.
         backupSheetName = GetUniqueBackupSheetName()
-        ws.Copy After:=ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count)
-        Set backupWs = ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count)
+        ws.Copy After:=GetRegisterWorkbook().Worksheets(GetRegisterWorkbook().Worksheets.Count)
+        Set backupWs = GetRegisterWorkbook().Worksheets(GetRegisterWorkbook().Worksheets.Count)
         backupWs.Name = backupSheetName
         LogLine "Создана временная резервная копия листа: " & originalSheetName
     End If
@@ -149,7 +149,7 @@ Failed:
             ' the original name successfully. If a rename fails, retain the
             ' backup and leave the remaining worksheet(s) available for recovery.
             Set damagedWs = Nothing
-            Set damagedWs = ThisWorkbook.Worksheets(originalSheetName)
+            Set damagedWs = GetRegisterWorkbook().Worksheets(originalSheetName)
             If damagedWs Is Nothing Then
                 Err.Clear
                 backupWs.Name = originalSheetName
@@ -189,7 +189,7 @@ Failed:
         End If
     ElseIf Not targetWasExisting Then
         Set ws = Nothing
-        Set ws = ThisWorkbook.Worksheets(sheetName)
+        Set ws = GetRegisterWorkbook().Worksheets(sheetName)
         If Not ws Is Nothing Then ws.Delete
         LogLine "Новый неполный лист удалён."
     End If
@@ -650,10 +650,10 @@ End Sub
 Private Function GetOrCreateSheet(ByVal sheetName As String) As Worksheet
     Dim ws As Worksheet
     On Error Resume Next
-    Set ws = ThisWorkbook.Worksheets(sheetName)
+    Set ws = GetRegisterWorkbook().Worksheets(sheetName)
     On Error GoTo 0
     If ws Is Nothing Then
-        Set ws = ThisWorkbook.Worksheets.Add(After:=ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count))
+        Set ws = GetRegisterWorkbook().Worksheets.Add(After:=GetRegisterWorkbook().Worksheets(GetRegisterWorkbook().Worksheets.Count))
         ws.Name = sheetName
     End If
     Set GetOrCreateSheet = ws
@@ -662,7 +662,7 @@ End Function
 Private Function WorksheetExists(ByVal sheetName As String) As Boolean
     Dim ws As Worksheet
     On Error Resume Next
-    Set ws = ThisWorkbook.Worksheets(sheetName)
+    Set ws = GetRegisterWorkbook().Worksheets(sheetName)
     WorksheetExists = Not ws Is Nothing
     On Error GoTo 0
 End Function
