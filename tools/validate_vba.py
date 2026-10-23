@@ -164,6 +164,7 @@ if analysis_module.exists():
         'приложение|приложения|приложению|приложением|приложении|приложений|прил',
         'mt.FirstIndex',
         'rng.Information(1)',
+        'failed = failed + 1',
     )
     for fragment in required_fragments:
         if fragment not in analysis_source:
