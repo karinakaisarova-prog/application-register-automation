@@ -9,11 +9,7 @@ Private Const RESULT_SHEET As String = "Упоминания отчёта"
 Private Const FIRST_RESULT_ROW As Long = 2
 
 Public Sub ScanWordReportMentions()
-    If GetRegisterWorkbook() Is Nothing Then
-        MsgBox "Сначала запустите StartRegisterAutomation, чтобы создать книгу результата.", vbExclamation, "Книга результата не найдена"
-        Exit Sub
-    End If
-    Dim fd As FileDialog
+   Dim fd As FileDialog
     Dim reportPath As String
     Dim wdApp As Object
     Dim wdDoc As Object
@@ -40,6 +36,11 @@ Public Sub ScanWordReportMentions()
     Dim cancelled As Boolean
     Dim oldStatusBar As Variant
     Dim oldCancelKey As XlEnableCancelKey
+
+    If GetRegisterWorkbook() Is Nothing Then
+        MsgBox "Сначала запустите StartRegisterAutomation, чтобы создать книгу результата.", vbExclamation, "Книга результата не найдена"
+        Exit Sub
+    End If
 
     oldScreen = Application.ScreenUpdating
     oldEvents = Application.EnableEvents
