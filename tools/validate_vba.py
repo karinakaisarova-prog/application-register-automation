@@ -110,13 +110,13 @@ for path in modules:
     source = path.read_text(encoding='utf-8-sig')
     public_procedures.update(
         name.lower()
-        for name in re.findall(r'^\\s*Public\\s+Sub\\s+([A-Za-z_][A-Za-z0-9_]*)\\b', source, re.I | re.M)
+        for name in re.findall(r'^\s*Public\s+Sub\s+([A-Za-z_][A-Za-z0-9_]*)\b', source, re.I | re.M)
     )
 
 panel_module = root / 'src' / 'vba' / 'modRegisterPanel.bas'
 if panel_module.exists():
     panel_source = panel_module.read_text(encoding='utf-8-sig')
-    macro_array = re.search(r'\\bmacroNames\\s*=\\s*Array\\((.*?)\\)', panel_source, re.I | re.S)
+    macro_array = re.search(r'\bmacroNames\s*=\s*Array\((.*?)\)', panel_source, re.I | re.S)
     if not macro_array:
         errors.append('modRegisterPanel.bas: macroNames array not found')
     else:
