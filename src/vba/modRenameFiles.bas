@@ -81,7 +81,15 @@ Public Sub RenameFilesFromRegister()
         ext = FileExtensionFromPath(oldPath)
         newName = CleanFileName(objectName & "_Приложение № " & appNo & "_" & titleText) & ext
         newPath = Left$(oldPath, InStrRev(oldPath, Application.PathSeparator)) & newName
-        If StrComp(oldPath, newPath, vbTextCompare) = 0 Then GoTo ContinueRow
+
+        ' The first row with complete naming fields is the candidate for this source,
+        ' even when its name is already correct or the target is blocked. Later rows
+        ' must not rename the same physical file using a different register row.
+        seenSource(oldPath) = r
+        If StrComp(oldPath, newPath, vbTextCompare) = 0 Then
+            problems = problems & "Строка " & r & ": имя файла уже соответствует полям перечня; переименование не требуется." & vbCrLf
+            GoTo ContinueRow
+        End If
         If seen.Exists(newPath) Then
             problems = problems & "Строка " & r & ": дублируется целевое имя — " & newName & vbCrLf
             GoTo ContinueRow
@@ -99,7 +107,6 @@ Public Sub RenameFilesFromRegister()
         rec("OldName") = Mid$(oldPath, InStrRev(oldPath, Application.PathSeparator) + 1)
         rec("NewName") = newName
         plan.Add rec
-        seenSource(oldPath) = r
 ContinueRow:
     Next r
 
