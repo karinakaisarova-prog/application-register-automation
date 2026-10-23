@@ -350,7 +350,7 @@ for module_name, function_prefix, log_prefix in (
                 errors.append(f'{module_name}: Word backup/recovery guard missing: {fragment}')
         backup_pos = module_source.find('FileCopy reportPath, backupPath')
         change_pos = module_source.find('changesStarted = True', backup_pos)
-        first_edit_pos = module_source.find('EnsureTableCaptionLabel(wdDoc)') if module_name == 'modTableNumbering.bas' else module_source.find('wordRange.Delete')
+        first_edit_pos = module_source.find('EnsureTableCaptionLabel wdDoc') if module_name == 'modTableNumbering.bas' else module_source.find('wordRange.Delete')
         if backup_pos < 0 or change_pos < backup_pos or first_edit_pos < 0 or backup_pos > first_edit_pos:
             # Bullet list edit is inside a later loop; backup must precede its first deletion.
             errors.append(f'{module_name}: backup must be created before document edits')
