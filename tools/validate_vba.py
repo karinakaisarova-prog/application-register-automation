@@ -104,6 +104,26 @@ for name, entries in seen.items():
             ', '.join(f'{p.relative_to(root)}:{n}' for p, n, _ in entries)
         )
 
+# Every macro wired to a visible panel button must resolve to a Public Sub.
+public_procedures = set()
+for path in modules:
+    source = path.read_text(encoding='utf-8-sig')
+    public_procedures.update(
+        name.lower()
+        for name in re.findall(r'^\\s*Public\\s+Sub\\s+([A-Za-z_][A-Za-z0-9_]*)\\b', source, re.I | re.M)
+    )
+
+panel_module = root / 'src' / 'vba' / 'modRegisterPanel.bas'
+if panel_module.exists():
+    panel_source = panel_module.read_text(encoding='utf-8-sig')
+    macro_array = re.search(r'\\bmacroNames\\s*=\\s*Array\\((.*?)\\)', panel_source, re.I | re.S)
+    if not macro_array:
+        errors.append('modRegisterPanel.bas: macroNames array not found')
+    else:
+        for macro_name in re.findall(r'"([^"]+)"', macro_array.group(1)):
+            if macro_name.lower() not in public_procedures:
+                errors.append('modRegisterPanel.bas: button target is not a Public Sub: ' + macro_name)
+
 # Guard a critical project requirement: object detection must walk the full
 # folder chain, including parents above the selected root, before checking the filename.
 list_module = root / 'src' / 'vba' / 'modApplicationsList.bas'
