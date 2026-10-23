@@ -310,6 +310,17 @@ if launcher_path.exists():
     if any(byte > 127 for byte in launcher_bytes):
         errors.append('Установить_книгу_Excel.cmd: launcher must remain ASCII-only')
 
+# Keep installer recovery behavior covered by static regression checks.
+if installer_path.exists():
+    for fragment in (
+        '$backupPath = Join-Path',
+        '$convertedOutputCreated = $true',
+        'if (-not $success -and $convertedOutputCreated -and $finalPath -ne $workbookPath)',
+        'Remove-Item -LiteralPath $finalPath -Force -ErrorAction Stop',
+    ):
+        if fragment not in installer_source:
+            errors.append('setup_excel.ps1: installer safety guard missing: ' + fragment)
+
 print(f'Modules scanned: {len(modules)}; procedures/functions: {sum(len(x) for x in seen.values())}')
 if errors:
     print('\n'.join('ERROR: ' + x for x in errors))
