@@ -325,6 +325,24 @@ if installer_path.exists():
             errors.append('setup_excel.ps1: installer safety guard missing: ' + fragment)
 
 
+
+# Mixed leading indentation can indicate nested list levels. The bullet fixer
+# must stop before editing such a document instead of flattening those levels.
+bullet_module = root / 'src' / 'vba' / 'modBulletListAudit.bas'
+if bullet_module.exists():
+    bullet_source = bullet_module.read_text(encoding='utf-8-sig')
+    for fragment in (
+        'GetBulletIndentLevel(txt)',
+        'If currentIndent <> runIndent Then unsafeGroup = True',
+        'If unsafeGroup Then unsafeGroupsFound = unsafeGroupsFound + 1',
+        'If unsafeGroupsFound > 0 Then',
+        'Автоматическое исправление не выполнено, чтобы не потерять структуру вложенности.',
+        'Private Function GetBulletIndentLevel(ByVal paragraphText As String) As Long',
+    ):
+        if fragment not in bullet_source:
+            errors.append('modBulletListAudit.bas: nested-list safety guard missing: ' + fragment)
+
+
 # Guard Word-document edits: a same-folder backup must be made before changes,
 # and a failed/cancelled edit must attempt restoration after closing Word.
 for module_name, function_prefix, log_prefix in (
