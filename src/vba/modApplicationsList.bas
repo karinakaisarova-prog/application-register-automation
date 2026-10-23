@@ -395,7 +395,7 @@ Private Function FindObjectInText(ByVal sourceText As String, ByVal objectNames 
     For i = LBound(objectNames) To UBound(objectNames)
         objectName = CStr(objectNames(i))
         ' Match a complete code/name, not a substring inside another word.
-        rx.Pattern = "(^|[^А-Яа-яA-Za-z0-9])" & objectName & "([^А-Яа-яA-Za-z0-9]|$)"
+        rx.Pattern = "(^|[^А-Яа-яЁёA-Za-z0-9])" & objectName & "([^А-Яа-яЁёA-Za-z0-9]|$)"
         If rx.Test(sourceText) Then
             FindObjectInText = objectName
             Exit Function
