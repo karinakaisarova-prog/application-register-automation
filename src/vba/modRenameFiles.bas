@@ -38,7 +38,11 @@ Public Sub RenameFilesFromRegister()
     Application.ScreenUpdating = False
     Application.EnableEvents = False
 
-    Set ws = ActiveSheet
+    Set ws = GetActiveRegisterSheet()
+    If ws Is Nothing Then
+        MsgBox "Не найден лист перечня в книге результата. Сначала сформируйте перечень.", vbExclamation
+        GoTo CleanExit
+    End If
     lastRow = ws.Cells(ws.Rows.Count, COL_LINK).End(xlUp).Row
     If lastRow < FIRST_DATA_ROW Then
         MsgBox "На активном листе нет строк для переименования.", vbInformation
