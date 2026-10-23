@@ -157,6 +157,7 @@ if rename_module.exists():
         'Set rollbackItem = renamedItems(rollbackIndex)',
         'For recoveryIndex = reversedItems.Count To 1 Step -1',
         'Set item = reversedItems(recoveryIndex)',
+        'Application.EnableCancelKey = xlDisabled',
     )
     for fragment in rollback_guards:
         if fragment not in rename_source:
