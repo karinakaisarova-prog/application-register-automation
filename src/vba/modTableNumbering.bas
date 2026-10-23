@@ -13,6 +13,10 @@ Private Const WD_CAPTION_POSITION_ABOVE As Long = 0
 Private Const WD_FIELD_SEQUENCE As Long = 12
 
 Public Sub CheckAndNumberWordTables()
+    If GetRegisterWorkbook() Is Nothing Then
+        MsgBox "Сначала запустите StartRegisterAutomation, чтобы создать книгу результата.", vbExclamation, "Книга результата не найдена"
+        Exit Sub
+    End If
     Dim fd As FileDialog
     Dim reportPath As String
     Dim wdApp As Object
