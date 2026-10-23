@@ -92,7 +92,7 @@ Public Sub ScanWordReportMentions()
     Set rx = CreateObject("VBScript.RegExp")
     rx.Global = True
     rx.IgnoreCase = True
-    rx.Pattern = "(приложени[ея]|прил)\.?\s*(№|номер)?\s*([0-9]+[А-ЯA-Z]?)"
+    rx.Pattern = "(приложение|приложения|приложению|приложением|приложении|приложений|прил)\.?\s*(№|номер)?\s*([0-9]+[А-ЯA-Z]?)"
 
     For Each para In wdDoc.Paragraphs
         DoEvents
