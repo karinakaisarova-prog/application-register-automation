@@ -388,10 +388,10 @@ End Sub
 
 Private Function GetOrCreateTableReportSheet(ByVal sheetName As String) As Worksheet
     On Error Resume Next
-    Set GetOrCreateTableReportSheet = ThisWorkbook.Worksheets(sheetName)
+    Set GetOrCreateTableReportSheet = GetRegisterWorkbook().Worksheets(sheetName)
     On Error GoTo 0
     If GetOrCreateTableReportSheet Is Nothing Then
-        Set GetOrCreateTableReportSheet = ThisWorkbook.Worksheets.Add(After:=ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count))
+        Set GetOrCreateTableReportSheet = GetRegisterWorkbook().Worksheets.Add(After:=GetRegisterWorkbook().Worksheets(GetRegisterWorkbook().Worksheets.Count))
         GetOrCreateTableReportSheet.Name = sheetName
     End If
 End Function
