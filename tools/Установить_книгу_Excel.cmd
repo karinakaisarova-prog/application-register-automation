@@ -1,21 +1,20 @@
 @echo off
 setlocal
-chcp 65001 >nul
-title Установка макросов Excel
+title Excel macro installer
 
 set "PS=%SystemRoot%\System32\WindowsPowerShell\v1.0\powershell.exe"
 set "SCRIPT=%~dp0setup_excel.ps1"
 
 if not exist "%PS%" (
-  echo Не удалось найти Windows PowerShell.
-  echo Пришлите скриншот этого окна.
+  echo Windows PowerShell was not found.
+  echo Please send a screenshot of this window.
   pause
   exit /b 1
 )
 
 if not exist "%SCRIPT%" (
-  echo Не найден файл setup_excel.ps1.
-  echo Убедитесь, что ZIP-архив полностью распакован и этот CMD-файл находится в папке tools.
+  echo setup_excel.ps1 was not found.
+  echo Extract the complete ZIP archive and run this file from the tools folder.
   pause
   exit /b 1
 )
@@ -25,10 +24,10 @@ set "RESULT=%ERRORLEVEL%"
 
 echo.
 if not "%RESULT%"=="0" (
-  echo Установка не завершена. Ничего не исправляйте вручную.
-  echo Сделайте скриншот этого окна и пришлите его в чат.
+  echo Installation failed or was interrupted.
+  echo Do not change anything manually. Send a screenshot of this window.
 ) else (
-  echo Работа установщика завершена.
+  echo Installer process finished. Read the PowerShell message above.
 )
 pause
 exit /b %RESULT%
