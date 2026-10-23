@@ -191,6 +191,9 @@ if analysis_module.exists():
         'mt.FirstIndex',
         'rng.Information(1)',
         'failed = failed + 1',
+        'oldPageValues = ws.Range("J3:J" & lastRow).Formula',
+        'If pageSnapshotTaken Then ws.Range("J3:J" & lastRow).Formula = oldPageValues',
+        'Application.EnableCancelKey = oldCancelKey',
     )
     for fragment in required_fragments:
         if fragment not in analysis_source:
