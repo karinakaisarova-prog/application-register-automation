@@ -148,6 +148,20 @@ if analysis_module.exists():
         if fragment not in analysis_source:
             errors.append(f'modReportAnalysis.bas: required mention-scanning logic missing: {fragment}')
 
+# Guard transactional recovery for batch file renaming: both failure paths must unwind in reverse order.
+rename_module = root / 'src' / 'vba' / 'modRenameFiles.bas'
+if rename_module.exists():
+    rename_source = rename_module.read_text(encoding='utf-8-sig')
+    rollback_guards = (
+        'For rollbackIndex = renamedItems.Count To 1 Step -1',
+        'Set rollbackItem = renamedItems(rollbackIndex)',
+        'For recoveryIndex = reversedItems.Count To 1 Step -1',
+        'Set item = reversedItems(recoveryIndex)',
+    )
+    for fragment in rollback_guards:
+        if fragment not in rename_source:
+            errors.append(f'modRenameFiles.bas: reverse-order recovery logic missing: {fragment}')
+
 missing = sorted(x for x in required if x.lower() not in seen)
 if missing:
     errors.append('Missing required entry points: ' + ', '.join(missing))
