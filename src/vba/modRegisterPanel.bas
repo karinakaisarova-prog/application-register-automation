@@ -12,12 +12,16 @@ Private Const BUTTON_HEIGHT As Double = 30
 Private Const BUTTON_GAP As Double = 6
 
 Public Sub AddRegisterControlPanel()
-    If TypeName(ActiveSheet) <> "Worksheet" Then
-        MsgBox "Сначала откройте лист с перечнем приложений.", vbExclamation, "Панель макросов"
+    Dim ws As Worksheet
+
+    Set ws = GetActiveRegisterSheet()
+    If ws Is Nothing Then
+        MsgBox "Не найден лист перечня в книге результата. Сначала сформируйте перечень и откройте его лист.", _
+               vbExclamation, "Панель макросов"
         Exit Sub
     End If
 
-    CreateRegisterControlPanel ActiveSheet
+    CreateRegisterControlPanel ws
     MsgBox "Панель макросов добавлена справа от таблицы. Если её не видно, прокрутите лист вправо.", _
            vbInformation, "Панель макросов"
 End Sub
