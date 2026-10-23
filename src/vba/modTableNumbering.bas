@@ -406,8 +406,8 @@ Private Function HasTableSequenceField(ByVal wdDoc As Object, ByVal tableStart A
     ' paragraph beginning with the visible label "Таблица".
     For paraIndex = wdDoc.Paragraphs.Count To 1 Step -1
         Set para = wdDoc.Paragraphs(paraIndex).Range
-        If para.Start >= tableStart Then
-            ' Paragraph is at or inside the table; skip it.
+        If para.Start >= tableStart Or para.Information(WD_WITHIN_TABLE) Then
+            ' Skip the current table and paragraphs inside any earlier table.
         ElseIf para.End <= tableStart Then
             checkedParagraphs = checkedParagraphs + 1
             paraText = CStr(para.Text)
