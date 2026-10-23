@@ -23,9 +23,9 @@ Public Sub StartRegisterAutomation()
     Set sourceData = sourceWb.Worksheets("data")
     On Error GoTo Failed
 
-    ' If the macro host has no data sheet, let the user choose the workbook
-    ' that already contains the reference sheet. No blank workbook is created
-    ' until this step succeeds or the user explicitly proceeds without data.
+    ' If the macro host has no data sheet, let the user choose a workbook
+    ' that contains the required reference sheet. If the user cancels or the
+    ' sheet is missing, do not create a result workbook.
     If sourceData Is Nothing Then
         dataPath = Application.GetOpenFilename( _
             FileFilter:="Книги Excel (*.xlsx;*.xlsm;*.xlsb),*.xlsx;*.xlsm;*.xlsb", _
@@ -75,6 +75,10 @@ Public Sub StartRegisterAutomation()
     Exit Sub
 
 Failed:
+    Dim failureNumber As Long
+    Dim failureDescription As String
+    failureNumber = Err.Number
+    failureDescription = Err.Description
     On Error Resume Next
     If Not dataWb Is Nothing Then dataWb.Close SaveChanges:=False
     If Not resultWb Is Nothing Then
@@ -83,11 +87,14 @@ Failed:
             resultWb.Close SaveChanges:=False
         End If
     End If
+    If Not resultWb Is Nothing Then
+        If resultWb Is gRegisterWorkbook Then Set gRegisterWorkbook = Nothing
+    End If
     Application.DisplayAlerts = oldAlerts
     Application.ScreenUpdating = oldScreen
     On Error GoTo 0
     MsgBox "Не удалось подготовить книгу для перечня." & vbCrLf & _
-           "Ошибка " & Err.Number & ": " & Err.Description, vbExclamation, "Автоматизация перечня"
+           "Ошибка " & failureNumber & ": " & failureDescription, vbExclamation, "Автоматизация перечня"
 End Sub
 
 Public Function GetRegisterWorkbook() As Workbook
