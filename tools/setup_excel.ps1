@@ -1,7 +1,7 @@
 $ErrorActionPreference = "Stop"
 
-# Builds a macro-enabled workbook, imports the project's VBA modules,
-# and copies the existing "data" worksheet from a workbook chosen by the user.
+# Creates a macro-enabled COPY of the user's existing workbook, preserving all sheets,
+# imports the project's VBA modules, and leaves the original workbook untouched.
 # Requires Windows, desktop Excel, and trusted access to the VBA project object model.
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $vbaDir = Join-Path $repoRoot "src\vba"
@@ -28,7 +28,7 @@ Add-Type -AssemblyName System.Windows.Forms
 
 $sourceDialog = New-Object System.Windows.Forms.OpenFileDialog
 try {
-    $sourceDialog.Title = "Выберите существующую Excel-книгу, в которой уже есть лист data"
+    $sourceDialog.Title = "Выберите ваш Excel-файл с листом data"
     $sourceDialog.Filter = "Книги Excel (*.xlsx;*.xlsm;*.xlsb;*.xls)|*.xlsx;*.xlsm;*.xlsb;*.xls"
     $sourceDialog.Multiselect = $false
     $sourceDialog.CheckFileExists = $true
@@ -44,11 +44,11 @@ finally {
 
 $outputDialog = New-Object System.Windows.Forms.SaveFileDialog
 try {
-    $outputDialog.Title = "Сохранить новую книгу с макросами и листом data"
+    $outputDialog.Title = "Сохранить копию этой книги с макросами"
     $outputDialog.Filter = "Книга Excel с поддержкой макросов (*.xlsm)|*.xlsm"
-    $outputDialog.FileName = "ApplicationRegisterAutomation.xlsm"
+    $outputDialog.FileName = ([IO.Path]::GetFileNameWithoutExtension($sourcePath) + "_с_макросами.xlsm")
     $outputDialog.OverwritePrompt = $true
-    $outputDialog.InitialDirectory = [Environment]::GetFolderPath("MyDocuments")
+    $outputDialog.InitialDirectory = [IO.Path]::GetDirectoryName($sourcePath)
     if ($outputDialog.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) {
         Write-Host "Установка отменена. Ничего не создано." -ForegroundColor Yellow
         exit 0
@@ -58,7 +58,7 @@ try {
         $outputPath += ".xlsm"
     }
     if ([string]::Equals($sourcePath, $outputPath, [StringComparison]::OrdinalIgnoreCase)) {
-        throw "Нельзя сохранять новую книгу поверх исходного файла со справочником data. Выберите другое имя или папку."
+        throw "Нельзя сохранять поверх исходного файла. Выберите другое имя: оригинал останется без изменений."
     }
 }
 finally {
@@ -67,7 +67,6 @@ finally {
 
 $excel = $null
 $workbook = $null
-$sourceWorkbook = $null
 $success = $false
 try {
     $excel = New-Object -ComObject Excel.Application
@@ -75,9 +74,10 @@ try {
     $excel.DisplayAlerts = $false
     $excel.AskToUpdateLinks = $false
 
-    $sourceWorkbook = $excel.Workbooks.Open($sourcePath, 0, $true)
+    $workbook = $excel.Workbooks.Open($sourcePath, 0, $true)
+
     $sourceData = $null
-    foreach ($sheet in $sourceWorkbook.Worksheets) {
+    foreach ($sheet in $workbook.Worksheets) {
         if ([string]::Equals([string]$sheet.Name, "data", [StringComparison]::Ordinal)) {
             $sourceData = $sheet
             break
@@ -87,7 +87,6 @@ try {
         throw "В выбранной книге не найден лист с точным именем data. Исходная книга не изменена. Выберите правильный файл."
     }
 
-    $workbook = $excel.Workbooks.Add()
     try {
         $vbProject = $workbook.VBProject
         $null = $vbProject.VBComponents.Count
@@ -96,56 +95,36 @@ try {
         throw ("Excel заблокировал автоматическое добавление VBA-модулей. В Excel откройте Файл → Параметры → Центр управления безопасностью → Параметры центра управления безопасностью → Параметры макросов и включите «Доверять доступ к объектной модели проектов VBA». Затем закройте Excel и запустите установщик снова. Включайте эту настройку только если понимаете риск и доверяете исходникам проекта. Подробности: " + $_.Exception.Message)
     }
 
+    # Convert/save a separate macro-enabled copy before importing any code.
+    # The selected original is opened read-only and will be closed without saving.
+    $workbook.SaveAs($outputPath, 52)
+
+    # Replace only modules with the same names as the project modules to avoid duplicate components.
     foreach ($name in $moduleFiles) {
+        $moduleName = [IO.Path]::GetFileNameWithoutExtension($name)
+        for ($i = $vbProject.VBComponents.Count; $i -ge 1; $i--) {
+            $component = $vbProject.VBComponents.Item($i)
+            if ([string]::Equals([string]$component.Name, $moduleName, [StringComparison]::OrdinalIgnoreCase)) {
+                $vbProject.VBComponents.Remove($component)
+            }
+        }
         $fullPath = Join-Path $vbaDir $name
         $null = $vbProject.VBComponents.Import($fullPath)
         Write-Host ("Добавлен модуль: " + $name)
     }
 
-    # Copy the user's existing lookup sheet; copying does not edit the source workbook.
-    $sourceData.Copy($workbook.Worksheets.Item(1))
-    $dataSheet = $null
-    foreach ($sheet in $workbook.Worksheets) {
-        if ([string]::Equals([string]$sheet.Name, "data", [StringComparison]::Ordinal)) {
-            $dataSheet = $sheet
-            break
-        }
-    }
-    if ($dataSheet -eq $null) {
-        throw "Не удалось скопировать лист data. Новая книга не будет сохранена."
-    }
-
-    # Keep only the copied data sheet in the launcher workbook.
-    for ($i = $workbook.Worksheets.Count; $i -ge 1; $i--) {
-        $sheet = $workbook.Worksheets.Item($i)
-        if (-not [string]::Equals([string]$sheet.Name, "data", [StringComparison]::Ordinal)) {
-            $sheet.Delete()
-        }
-    }
-
-    # 52 = xlOpenXMLWorkbookMacroEnabled
-    $workbook.SaveAs($outputPath, 52)
+    $workbook.Save()
     $success = $true
 }
 finally {
-    if ($sourceWorkbook -ne $null) {
-        try { $sourceWorkbook.Close($false) } catch {}
-    }
     if ($workbook -ne $null) {
-        if (-not $success) {
-            try { $workbook.Close($false) } catch {}
-        } else {
-            try { $workbook.Close($true) } catch {}
-        }
+        try { $workbook.Close($success) } catch {}
     }
     if ($excel -ne $null) {
         try { $excel.Quit() } catch {}
     }
-    foreach ($obj in @($sourceWorkbook, $workbook, $excel)) {
-        if ($obj -ne $null) {
-            try { [void][Runtime.InteropServices.Marshal]::ReleaseComObject($obj) } catch {}
-        }
-    }
+    if ($workbook -ne $null) { try { [void][Runtime.InteropServices.Marshal]::ReleaseComObject($workbook) } catch {} }
+    if ($excel -ne $null) { try { [void][Runtime.InteropServices.Marshal]::ReleaseComObject($excel) } catch {} }
     [GC]::Collect()
     [GC]::WaitForPendingFinalizers()
 }
@@ -153,8 +132,9 @@ finally {
 if ($success) {
     Write-Host ""
     Write-Host ("Готово: " + $outputPath) -ForegroundColor Green
-    Write-Host "Лист data скопирован из выбранной книги; исходный файл не изменялся."
-    Write-Host "Откройте новую .xlsm-книгу в настольном Excel и сначала выполните Debug → Compile VBAProject (Alt+F11)."
+    Write-Host "Это отдельная копия выбранной книги: все листы, включая data, сохранены в ней."
+    Write-Host "Перечень будет формироваться в этой же копии, а не в отдельной книге результата."
+    Write-Host "Исходный файл не изменён. Откройте новую .xlsm-книгу и выполните Alt+F11 → Debug → Compile VBAProject."
     Write-Host "Не запускайте макросы до успешной компиляции."
     Read-Host "Нажмите Enter для завершения"
 }
