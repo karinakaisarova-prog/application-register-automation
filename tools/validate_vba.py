@@ -298,6 +298,20 @@ if table_module.exists():
             if fragment not in caption_code:
                 errors.append('modTableNumbering.bas: caption recognition guard missing: ' + fragment)
 
+# The final Word table audit must be populated on a staging sheet before replacing the preview.
+if table_module.exists():
+    final_report_guards = (
+        'Set finalWs = GetRegisterWorkbook().Worksheets.Add',
+        'FormatTableReport finalWs, r - 1',
+        'ws.Name = finalOldName',
+        'finalWs.Name = TABLE_REPORT_SHEET',
+        'FinalReportCommitFailed:',
+        'If Not finalWs Is Nothing Then',
+    )
+    for fragment in final_report_guards:
+        if fragment not in table_source:
+            errors.append('modTableNumbering.bas: staged final-report replacement guard missing: ' + fragment)
+
 # Guard against creating duplicate captions when a visible manual caption already exists.
 if table_module.exists():
     for fragment in (
