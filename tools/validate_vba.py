@@ -182,6 +182,20 @@ if readme.exists():
         if phrase in readme_text:
             errors.append(f'README.md: outdated object-detection rule remains: {phrase}')
 
+# Keep all user-facing documentation and manual test cases aligned with the
+# selected-root boundary; otherwise an obsolete test can reintroduce the old rule.
+for doc_path in (root / 'docs' / 'requirements.md', root / 'tests' / 'test-checklist.md'):
+    if doc_path.exists():
+        doc_text = doc_path.read_text(encoding='utf-8-sig').lower()
+        obsolete_object_rules = (
+            'включая папки выше выбранной исходной папки',
+            'включая родителей выше выбранного корня',
+            'объект определяется по этой папке',
+        )
+        for phrase in obsolete_object_rules:
+            if phrase in doc_text:
+                errors.append(f'{doc_path.relative_to(root)}: outdated object-detection rule remains: {phrase}')
+
 # Guard mention-scanning behavior that is easy to regress:
 # common grammatical forms must be recognized and each match must use its own start page.
 analysis_module = root / 'src' / 'vba' / 'modReportAnalysis.bas'
