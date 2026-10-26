@@ -124,27 +124,27 @@ if panel_module.exists():
             if macro_name.lower() not in public_procedures:
                 errors.append('modRegisterPanel.bas: button target is not a Public Sub: ' + macro_name)
 
-# Guard a critical project requirement: object detection must walk the full
-# folder chain, including parents above the selected root, before checking the filename.
+# Object detection is limited to the selected folder tree, then the filename.
+# A matching parent folder outside the selected root must not override the object.
 list_module = root / 'src' / 'vba' / 'modApplicationsList.bas'
 if list_module.exists():
     source = list_module.read_text(encoding='utf-8-sig')
     object_match = re.search(
-        r'Private Function GetObjectName\b(.*?)^End Function\s*$',
+        r'Private Function GetObjectName\\b(.*?)^End Function\\s*$',
         source, re.I | re.M | re.S
     )
     if not object_match:
         errors.append('modApplicationsList.bas: GetObjectName function not found')
     else:
         object_code = object_match.group(1)
-        if 'fso.GetParentFolderName(folderPath)' not in object_code:
-            errors.append('modApplicationsList.bas: GetObjectName must walk parent folders')
-        if re.search(r'StrComp\(\s*folderPath\s*,\s*rootPath', object_code, re.I):
-            errors.append('modApplicationsList.bas: GetObjectName must not stop at the selected root')
-        # Boundary characters are defined in FindObjectInText, which owns
-        # the regular expression; GetObjectName only walks folders and calls it.
+        if 'selectedRootPath' not in object_code:
+            errors.append('modApplicationsList.bas: GetObjectName must receive the selected root path')
+        if 'If StrComp(folderPath, selectedRootPath, vbTextCompare) = 0 Then Exit Do' not in object_code:
+            errors.append('modApplicationsList.bas: object detection must stop at the selected root')
+        if 'GetObjectName(currentPath, CStr(fileItem.Name), rootPath)' not in source:
+            errors.append('modApplicationsList.bas: GetObjectName must receive the selected root for each file')
         boundary_match = re.search(
-            r'Private Function FindObjectInText\b(.*?)^End Function\s*$',
+            r'Private Function FindObjectInText\\b(.*?)^End Function\\s*$',
             source, re.I | re.M | re.S
         )
         if not boundary_match or 'Ёё' not in boundary_match.group(1):
