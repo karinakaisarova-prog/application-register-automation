@@ -157,6 +157,13 @@ if list_module.exists():
     if not file_loop or 'DoEvents' not in file_loop.group(1) or 'Application.StatusBar' not in file_loop.group(1):
         errors.append('modApplicationsList.bas: file scan must yield to Excel and update progress inside the file loop')
 
+# File renaming must treat a broken register hyperlink update as a batch failure.
+rename_module = root / "src" / "vba" / "modRenameFiles.bas"
+if rename_module.exists():
+    rename_source = rename_module.read_text(encoding="utf-8-sig")
+    if "Не удалось обновить гиперссылку в строке" not in rename_source or "Err.Raise vbObjectError + 2401" not in rename_source:
+        errors.append("modRenameFiles.bas: hyperlink-update failure must trigger rollback")
+
 # Duplicate application numbers are compared after normalizing leading zeros, while retaining suffixes.
 if list_module.exists():
     duplicate_source = list_module.read_text(encoding='utf-8-sig')
