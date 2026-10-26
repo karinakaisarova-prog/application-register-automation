@@ -266,7 +266,7 @@ if analysis_module.exists():
 # Page-count helper must propagate Ctrl+Break instead of swallowing it under local Resume Next.
 if analysis_module.exists():
     workbook_pages_match = re.search(
-        r'Private Function CountWorkbookPrintPages\\b(.*?)^End Function\\s*$',
+        r'Private Function CountWorkbookPrintPages\b(.*?)^End Function\s*$',
         analysis_source, re.I | re.M | re.S
     )
     if not workbook_pages_match:
