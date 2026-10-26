@@ -150,6 +150,13 @@ if list_module.exists():
         if not boundary_match or 'Ёё' not in boundary_match.group(1):
             errors.append('modApplicationsList.bas: object-name boundaries must treat Ё/ё as Cyrillic letters')
 
+# Keep folder scans responsive so Ctrl+Break can be handled during large directories.
+if list_module.exists():
+    scan_source = list_module.read_text(encoding='utf-8-sig')
+    file_loop = re.search(r'For Each fileItem In folder\.Files(.*?)Next fileItem', scan_source, re.I | re.S)
+    if not file_loop or 'DoEvents' not in file_loop.group(1) or 'Application.StatusBar' not in file_loop.group(1):
+        errors.append('modApplicationsList.bas: file scan must yield to Excel and update progress inside the file loop')
+
 # Guard filename parsing against common grammatical forms of "Приложение".
 if list_module.exists():
     parser_source = list_module.read_text(encoding='utf-8-sig')
