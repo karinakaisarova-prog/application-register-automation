@@ -130,7 +130,7 @@ list_module = root / 'src' / 'vba' / 'modApplicationsList.bas'
 if list_module.exists():
     source = list_module.read_text(encoding='utf-8-sig')
     object_match = re.search(
-        r'Private Function GetObjectName\\b(.*?)^End Function\\s*$',
+        r'Private Function GetObjectName\b(.*?)^End Function\\s*$',
         source, re.I | re.M | re.S
     )
     if not object_match:
@@ -144,7 +144,7 @@ if list_module.exists():
         if 'GetObjectName(currentPath, CStr(fileItem.Name), rootPath)' not in source:
             errors.append('modApplicationsList.bas: GetObjectName must receive the selected root for each file')
         boundary_match = re.search(
-            r'Private Function FindObjectInText\\b(.*?)^End Function\\s*$',
+            r'Private Function FindObjectInText\b(.*?)^End Function\\s*$',
             source, re.I | re.M | re.S
         )
         if not boundary_match or 'Ёё' not in boundary_match.group(1):
