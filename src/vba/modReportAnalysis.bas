@@ -306,6 +306,11 @@ Public Sub CountPagesForRegister()
         ElseIf Len(filePath) > 0 Then
             ws.Cells(r, 10).Value = "Файл не найден"
             failed = failed + 1
+        Else
+            ' Do not leave a stale page count from an earlier run when the
+            ' register row has no usable hyperlink/path.
+            ws.Cells(r, 10).Value = "Нет ссылки на файл"
+            failed = failed + 1
         End If
 NextRow:
         Application.StatusBar = "Подсчёт страниц: строка " & r & " из " & lastRow
