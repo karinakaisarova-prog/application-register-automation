@@ -195,17 +195,24 @@ Failed:
             Set rollbackItem = renamedItems(rollbackIndex)
             rollbackError = TryRenameFile(CStr(rollbackItem("NewPath")), CStr(rollbackItem("OldPath")))
             If Len(rollbackError) = 0 Then
+                rollbackError = ""
                 If Not ws Is Nothing Then
-                    ws.Cells(CLng(rollbackItem("Row")), COL_LINK).Hyperlinks.Delete
-                    ws.Hyperlinks.Add Anchor:=ws.Cells(CLng(rollbackItem("Row")), COL_LINK), _
-                        Address:=CStr(rollbackItem("OldPath")), TextToDisplay:="Открыть файл"
+                    rollbackError = RestoreRegisterHyperlink(ws, CLng(rollbackItem("Row")), CStr(rollbackItem("OldPath")))
                 End If
-                ' Keep the journal consistent with the actual file state after rollback.
+                If Len(rollbackError) > 0 Then
+                    problems = problems & "Файл возвращён, но ссылка в строке " & CLng(rollbackItem("Row")) & _
+                               " не восстановлена: " & rollbackError & vbCrLf
+                End If
+                ' Journal records both filesystem recovery and any hyperlink repair problem.
                 If Not logWs Is Nothing And Len(batchId) > 0 Then
                     For r = 2 To logWs.Cells(logWs.Rows.Count, 1).End(xlUp).Row
                         If Trim$(CStr(logWs.Cells(r, 8).Value)) = batchId And _
                            StrComp(CStr(logWs.Cells(r, 4).Value), CStr(rollbackItem("OldPath")), vbTextCompare) = 0 Then
-                            logWs.Cells(r, 7).Value = "Автоматически отменён после прерывания"
+                            If Len(rollbackError) = 0 Then
+                                logWs.Cells(r, 7).Value = "Автоматически отменён после прерывания"
+                            Else
+                                logWs.Cells(r, 7).Value = "Файл возвращён; ошибка восстановления ссылки: " & rollbackError
+                            End If
                             Exit For
                         End If
                     Next r
@@ -334,12 +341,19 @@ Public Sub RollbackLastRenameBatch()
                     Set registerWs = Nothing
                     On Error Resume Next
                     Set registerWs = GetRegisterWorkbook().Worksheets(sheetName)
-                    If Not registerWs Is Nothing And registerRow > 0 Then
-                        registerWs.Cells(registerRow, COL_LINK).Hyperlinks.Delete
-                        registerWs.Hyperlinks.Add Anchor:=registerWs.Cells(registerRow, COL_LINK), _
-                            Address:=oldPath, TextToDisplay:="Открыть файл"
-                    End If
                     On Error GoTo Failed
+                    recoveryError = ""
+                    If Not registerWs Is Nothing And registerRow > 0 Then
+                        recoveryError = RestoreRegisterHyperlink(registerWs, registerRow, oldPath)
+                    Else
+                        recoveryError = "Не найден лист или строка перечня для обновления ссылки."
+                    End If
+                    If Len(recoveryError) = 0 Then
+                        logWs.Cells(r, 7).Value = "Откатан"
+                    Else
+                        logWs.Cells(r, 7).Value = "Файл возвращён; ошибка восстановления ссылки: " & recoveryError
+                        skipped = skipped + 1
+                    End If
                     restored = restored + 1
                 Else
                     logWs.Cells(r, 7).Value = "Ошибка отката: " & errText
@@ -367,10 +381,16 @@ Failed:
             logWs.Cells(logRow, 7).Value = "Переименован"
             Set registerWs = Nothing
             Set registerWs = GetRegisterWorkbook().Worksheets(CStr(item("SheetName")))
+            recoveryError = ""
             If Not registerWs Is Nothing And CLng(item("RegisterRow")) > 0 Then
-                registerWs.Cells(CLng(item("RegisterRow")), COL_LINK).Hyperlinks.Delete
-                registerWs.Hyperlinks.Add Anchor:=registerWs.Cells(CLng(item("RegisterRow")), COL_LINK), _
-                    Address:=CStr(item("NewPath")), TextToDisplay:="Открыть файл"
+                recoveryError = RestoreRegisterHyperlink(registerWs, CLng(item("RegisterRow")), CStr(item("NewPath")))
+            Else
+                recoveryError = "Не найден лист или строка перечня для обновления ссылки."
+            End If
+            If Len(recoveryError) > 0 Then
+                logWs.Cells(logRow, 7).Value = "Файл возвращён к новому имени; ошибка восстановления ссылки: " & recoveryError
+                failure = failure & vbCrLf & "Файл восстановлен, но ссылка не обновлена: " & CStr(item("NewPath")) & _
+                          " (" & recoveryError & ")"
             End If
         Else
             logWs.Cells(logRow, 7).Value = "Ошибка восстановления после прерывания: " & recoveryError
@@ -392,6 +412,18 @@ CleanExit:
     Application.EnableCancelKey = oldCancelKey
     On Error GoTo 0
 End Sub
+
+
+Private Function RestoreRegisterHyperlink(ByVal targetWs As Worksheet, ByVal rowNo As Long, ByVal filePath As String) As String
+    On Error GoTo LinkError
+    targetWs.Cells(rowNo, COL_LINK).Hyperlinks.Delete
+    targetWs.Hyperlinks.Add Anchor:=targetWs.Cells(rowNo, COL_LINK), _
+        Address:=filePath, TextToDisplay:="Открыть файл"
+    Exit Function
+LinkError:
+    RestoreRegisterHyperlink = Err.Description
+    Err.Clear
+End Function
 
 Private Function TryRenameFile(ByVal oldPath As String, ByVal newPath As String) As String
     On Error GoTo RenameError
