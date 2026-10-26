@@ -307,6 +307,8 @@ if table_module.exists():
         'finalWs.Name = TABLE_REPORT_SHEET',
         'FinalReportCommitFailed:',
         'If Not finalWs Is Nothing Then',
+        'Deleting the old preview is cleanup, not part of the Word edit transaction.',
+        'If Err.Number = 0 Then',
     )
     for fragment in final_report_guards:
         if fragment not in table_source:
