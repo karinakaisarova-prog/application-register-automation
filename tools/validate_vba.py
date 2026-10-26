@@ -176,6 +176,7 @@ if readme.exists():
         'внешние родительские папки выше корня не используются',
         'код из внешней папки выше выбранного корня не используется',
         'only inside the selected root',
+        'включая родительские папки выше выбранного корня',
     )
     for phrase in contradictory_phrases:
         if phrase in readme_text:
