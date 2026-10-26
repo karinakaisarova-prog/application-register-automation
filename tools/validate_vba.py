@@ -164,6 +164,17 @@ if rename_module.exists():
     if "Не удалось обновить гиперссылку в строке" not in rename_source or "Err.Raise vbObjectError + 2401" not in rename_source:
         errors.append("modRenameFiles.bas: hyperlink-update failure must trigger rollback")
 
+# Rollback must report a failed hyperlink repair even when the filesystem rename itself succeeded.
+if rename_module.exists():
+    recovery_source = rename_module.read_text(encoding='utf-8-sig')
+    for fragment in (
+        'Private Function RestoreRegisterHyperlink(',
+        'Файл возвращён; ошибка восстановления ссылки:',
+        'Файл возвращён, но ссылка в строке ',
+    ):
+        if fragment not in recovery_source:
+            errors.append('modRenameFiles.bas: rollback hyperlink-repair reporting missing: ' + fragment)
+
 # Duplicate application numbers are compared after normalizing leading zeros, while retaining suffixes.
 if list_module.exists():
     duplicate_source = list_module.read_text(encoding='utf-8-sig')
