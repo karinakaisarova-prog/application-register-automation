@@ -255,7 +255,7 @@ Private Sub CollectFiles(ByVal rootPath As String, ByVal currentPath As String, 
             If Not mSeenPaths.Exists(CStr(fileItem.Path)) Then
                 mSeenPaths.Add CStr(fileItem.Path), True
                 Set info = ParseFileName(CStr(fileItem.Name))
-                objectName = GetObjectName(currentPath, CStr(fileItem.Name))
+                objectName = GetObjectName(currentPath, CStr(fileItem.Name), rootPath)
                 Dim rec As Object
                 Set rec = CreateObject("Scripting.Dictionary")
                 rec("Path") = CStr(fileItem.Path)
@@ -349,7 +349,7 @@ Private Function ParseFileName(ByVal fileName As String) As Object
     Set ParseFileName = result
 End Function
 
-Private Function GetObjectName(ByVal currentPath As String, ByVal fileName As String) As String
+Private Function GetObjectName(ByVal currentPath As String, ByVal fileName As String, ByVal selectedRootPath As String) As String
     Dim fso As Object
     Dim folderPath As String
     Dim parentPath As String
@@ -357,14 +357,13 @@ Private Function GetObjectName(ByVal currentPath As String, ByVal fileName As St
     Dim candidate As String
     Dim objectNames As Variant
 
-    ' Keep the six approved object labels in one place.
+    ' Only inspect folders inside the selected root, including the root itself.
+    ' A parent folder outside the selected root must not determine the object.
     objectNames = Array("КЗТ", "СМТ", "АМТ", "Саратов", "НТУ", "КТ")
     Set fso = CreateObject("Scripting.FileSystemObject")
     folderPath = RemoveTrailingSlash(currentPath)
+    selectedRootPath = RemoveTrailingSlash(selectedRootPath)
 
-    ' Per requirements, inspect the complete folder path: start with the
-    ' file's nearest folder and continue through every parent, including
-    ' parents above the selected root. The nearest matching folder wins.
     Do While Len(folderPath) > 0
         folderName = GetFolderName(folderPath)
         candidate = FindObjectInText(folderName, objectNames)
@@ -373,13 +372,15 @@ Private Function GetObjectName(ByVal currentPath As String, ByVal fileName As St
             Exit Function
         End If
 
+        ' Stop after checking the selected root; never inspect its parent.
+        If StrComp(folderPath, selectedRootPath, vbTextCompare) = 0 Then Exit Do
         parentPath = fso.GetParentFolderName(folderPath)
         If Len(parentPath) = 0 Or StrComp(parentPath, folderPath, vbTextCompare) = 0 Then Exit Do
         folderPath = RemoveTrailingSlash(parentPath)
     Loop
 
-    ' Only if no approved object was found in any folder of the full path,
-    ' inspect the filename. Do not guess if it also has no approved label.
+    ' If no approved object was found in the selected folder chain, inspect
+    ' the filename. Return blank rather than guessing an unapproved object.
     GetObjectName = FindObjectInText(fileName, objectNames)
 End Function
 
