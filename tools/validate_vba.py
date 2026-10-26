@@ -198,6 +198,13 @@ if list_module.exists():
         if fragment not in parser_source:
             errors.append(f'modApplicationsList.bas: filename parser missing expected form/index: {fragment}')
 
+# Duplicate highlighting must use the same normalized key as the counting pass;
+# otherwise values such as 01 and 1 are counted together but not all highlighted.
+if list_module.exists():
+    duplicate_key = 'key = UCase$(objectName) & "|" & NormalizeApplicationNumberForDuplicateCheck(appNumber)'
+    if list_module.read_text(encoding='utf-8-sig').count(duplicate_key) < 2:
+        errors.append('modApplicationsList.bas: duplicate counting and highlighting must use the same normalized key')
+
 # Special department marker applies only to the two explicitly named base filenames.
 if list_module.exists():
     special_source = list_module.read_text(encoding='utf-8-sig')
