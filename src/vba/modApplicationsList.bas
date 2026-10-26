@@ -538,7 +538,7 @@ Private Sub CheckDuplicateApplicationNumbers(ByVal ws As Worksheet)
         objectName = Trim$(CStr(ws.Cells(r, 2).Value))
         appNumber = Trim$(CStr(ws.Cells(r, 3).Value))
         If Len(objectName) > 0 And Len(appNumber) > 0 Then
-            key = UCase$(objectName) & "|" & UCase$(appNumber)
+            key = UCase$(objectName) & "|" & NormalizeApplicationNumberForDuplicateCheck(appNumber)
             If counts.Exists(key) Then
                 counts(key) = CLng(counts(key)) + 1
             Else
@@ -573,6 +573,20 @@ Private Sub CheckDuplicateApplicationNumbers(ByVal ws As Worksheet)
         LogLine "Проверка нумерации: отмечено строк с повторяющимися номерами: " & duplicateCount & "."
     End If
 End Sub
+
+Private Function NormalizeApplicationNumberForDuplicateCheck(ByVal appNumber As String) As String
+    Dim value As String
+    value = UCase$(Trim$(appNumber))
+
+    ' Leading zeros do not make a different application number (01 = 1, 001A = 1A).
+    ' Preserve a trailing letter suffix because 1A and 1B are distinct numbers.
+    Do While Len(value) > 1 And Left$(value, 1) = "0" And _
+             Mid$(value, 2, 1) >= "0" And Mid$(value, 2, 1) <= "9"
+        value = Mid$(value, 2)
+    Loop
+
+    NormalizeApplicationNumberForDuplicateCheck = value
+End Function
 
 Private Sub ApplyLookups(ByVal ws As Worksheet)
     Dim lastRow As Long
