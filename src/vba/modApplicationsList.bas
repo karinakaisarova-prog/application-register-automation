@@ -250,6 +250,8 @@ Private Sub CollectFiles(ByVal rootPath As String, ByVal currentPath As String, 
     Set folder = fso.GetFolder(currentPath)
 
     For Each fileItem In folder.Files
+        DoEvents
+        Application.StatusBar = "Проверка файла: " & CStr(fileItem.Name)
         ext = LCase$(fso.GetExtensionName(fileItem.Name))
         If IsSupportedExtension(ext) Then
             If Not mSeenPaths.Exists(CStr(fileItem.Path)) Then
