@@ -150,6 +150,17 @@ if list_module.exists():
         if not boundary_match or 'Ёё' not in boundary_match.group(1):
             errors.append('modApplicationsList.bas: object-name boundaries must treat Ё/ё as Cyrillic letters')
 
+# Guard filename parsing against common grammatical forms of "Приложение".
+if list_module.exists():
+    parser_source = list_module.read_text(encoding='utf-8-sig')
+    parser_forms = (
+        'приложение|приложения|приложению|приложением|приложении|приложений|прил',
+        'matches(0).SubMatches(2)',
+    )
+    for fragment in parser_forms:
+        if fragment not in parser_source:
+            errors.append(f'modApplicationsList.bas: filename parser missing expected form/index: {fragment}')
+
 # Special department marker applies only to the two explicitly named base filenames.
 if list_module.exists():
     special_source = list_module.read_text(encoding='utf-8-sig')
