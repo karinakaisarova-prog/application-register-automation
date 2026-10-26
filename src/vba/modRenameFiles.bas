@@ -147,10 +147,22 @@ ContinueRow:
         logWs.Cells(logRow, 5).Value = item("NewName")
         logWs.Cells(logRow, 6).Value = item("NewPath")
         If Len(failure) = 0 Then
+            ' A successful filesystem rename is not enough: the register must point to it.
+            ' If hyperlink replacement fails, raise into the batch handler so the file rename
+            ' is rolled back rather than leaving a stale or missing link.
             On Error Resume Next
+            Err.Clear
             ws.Cells(CLng(item("Row")), COL_LINK).Hyperlinks.Delete
-            ws.Hyperlinks.Add Anchor:=ws.Cells(CLng(item("Row")), COL_LINK), _
-                Address:=CStr(item("NewPath")), TextToDisplay:="Открыть файл"
+            If Err.Number = 0 Then
+                ws.Hyperlinks.Add Anchor:=ws.Cells(CLng(item("Row")), COL_LINK), _
+                    Address:=CStr(item("NewPath")), TextToDisplay:="Открыть файл"
+            End If
+            If Err.Number <> 0 Then
+                failure = "Не удалось обновить гиперссылку в строке " & item("Row") & ": " & Err.Description
+                Err.Clear
+                On Error GoTo Failed
+                Err.Raise vbObjectError + 2401, "RenameFilesFromRegister", failure
+            End If
             On Error GoTo Failed
             logWs.Cells(logRow, 7).Value = "Переименован"
             logWs.Cells(logRow, 8).Value = batchId
