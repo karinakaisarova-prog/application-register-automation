@@ -246,10 +246,18 @@ Public Sub CheckAndNumberWordTables()
     Set ws = finalWs
     Set finalWs = Nothing
     Application.DisplayAlerts = False
+    ' Deleting the old preview is cleanup, not part of the Word edit transaction.
+    ' If Excel refuses to delete it, keep the backup sheet rather than restoring
+    ' the Word file after the final report has already been committed.
+    On Error Resume Next
     GetRegisterWorkbook().Worksheets(finalOldName).Delete
-    finalOldRenamed = False
-    Application.DisplayAlerts = oldAlerts
+    If Err.Number = 0 Then
+        finalOldRenamed = False
+    Else
+        Err.Clear
+    End If
     On Error GoTo Failed
+    Application.DisplayAlerts = oldAlerts
     ws.Activate
 
     MsgBox "Обработка завершена." & vbCrLf & _
