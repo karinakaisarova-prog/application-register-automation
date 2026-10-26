@@ -206,6 +206,7 @@ if analysis_module.exists():
         'mt.FirstIndex',
         'rng.Information(1)',
         'failed = failed + 1',
+        'ws.Cells(r, 10).Value = "Нет ссылки на файл"',
         'oldPageValues = ws.Range("J3:J" & lastRow).Formula',
         'If pageSnapshotTaken Then ws.Range("J3:J" & lastRow).Formula = oldPageValues',
         'Application.EnableCancelKey = oldCancelKey',
