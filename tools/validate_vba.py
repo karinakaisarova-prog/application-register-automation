@@ -157,6 +157,18 @@ if list_module.exists():
     if not file_loop or 'DoEvents' not in file_loop.group(1) or 'Application.StatusBar' not in file_loop.group(1):
         errors.append('modApplicationsList.bas: file scan must yield to Excel and update progress inside the file loop')
 
+# Duplicate application numbers are compared after normalizing leading zeros, while retaining suffixes.
+if list_module.exists():
+    duplicate_source = list_module.read_text(encoding='utf-8-sig')
+    duplicate_fragments = (
+        'NormalizeApplicationNumberForDuplicateCheck(appNumber)',
+        'NormalizeApplicationNumberForDuplicateCheck = value',
+        '01 = 1, 001A = 1A',
+    )
+    for fragment in duplicate_fragments:
+        if fragment not in duplicate_source:
+            errors.append(f'modApplicationsList.bas: duplicate-number normalization missing: {fragment}')
+
 # Guard filename parsing against common grammatical forms of "Приложение".
 if list_module.exists():
     parser_source = list_module.read_text(encoding='utf-8-sig')
