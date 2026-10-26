@@ -552,7 +552,7 @@ Private Sub CheckDuplicateApplicationNumbers(ByVal ws As Worksheet)
         objectName = Trim$(CStr(ws.Cells(r, 2).Value))
         appNumber = Trim$(CStr(ws.Cells(r, 3).Value))
         If Len(objectName) > 0 And Len(appNumber) > 0 Then
-            key = UCase$(objectName) & "|" & UCase$(appNumber)
+            key = UCase$(objectName) & "|" & NormalizeApplicationNumberForDuplicateCheck(appNumber)
             If counts.Exists(key) Then
                 If CLng(counts(key)) > 1 Then
                     ws.Cells(r, 2).Interior.Color = RGB(255, 199, 206)
