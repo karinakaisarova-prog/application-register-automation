@@ -412,17 +412,28 @@ Private Function CountWorkbookPrintPages(ByVal wb As Workbook) As Long
     Dim total As Long
     Dim h As Long
     Dim v As Long
+    Dim pageBreakError As Long
+    Dim pageBreakDescription As String
+
     For Each sh In wb.Worksheets
+        DoEvents
         On Error Resume Next
+        Err.Clear
         sh.DisplayPageBreaks = True
         h = sh.HPageBreaks.Count + 1
         v = sh.VPageBreaks.Count + 1
-        If Err.Number <> 0 Then
-            Err.Clear
+        pageBreakError = Err.Number
+        pageBreakDescription = Err.Description
+        On Error GoTo 0
+
+        ' Do not let the local best-effort page-break handling swallow Ctrl+Break.
+        If pageBreakError = 18 Then
+            Err.Raise pageBreakError, "CountWorkbookPrintPages", pageBreakDescription
+        ElseIf pageBreakError <> 0 Then
             h = 1
             v = 1
         End If
-        On Error GoTo 0
+
         If Application.WorksheetFunction.CountA(sh.UsedRange) > 0 Then total = total + (h * v)
     Next sh
     CountWorkbookPrintPages = total
