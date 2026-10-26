@@ -324,7 +324,7 @@ Private Function ParseFileName(ByVal fileName As String) As Object
     Set rx = CreateObject("VBScript.RegExp")
     rx.Global = False
     rx.IgnoreCase = True
-    rx.Pattern = "(приложени[ея]|прил)\.?\s*(№|номер)?\s*([0-9]+[А-ЯA-Z]?)"
+    rx.Pattern = "(приложение|приложения|приложению|приложением|приложении|приложений|прил)\.?\s*(№|номер)?\s*([0-9]+[А-ЯA-Z]?)"
     If rx.Test(baseName) Then
         Set matches = rx.Execute(baseName)
         appNumber = matches(0).SubMatches(2)
