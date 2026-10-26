@@ -266,7 +266,18 @@ if analysis_module.exists():
 # Page-count helper must propagate Ctrl+Break instead of swallowing it under local Resume Next.
 if analysis_module.exists():
     workbook_pages_match = re.search(
-        r'Private Function CountWorkbookPrintPages\\b(.*?)^End Function\\s*
+        r'Private Function CountWorkbookPrintPages\\b(.*?)^End Function\\s*$',
+        analysis_source, re.I | re.M | re.S
+    )
+    if not workbook_pages_match:
+        errors.append('modReportAnalysis.bas: CountWorkbookPrintPages function not found')
+    else:
+        workbook_pages_code = workbook_pages_match.group(1)
+        if 'If pageBreakError = 18 Then' not in workbook_pages_code or 'Err.Raise pageBreakError' not in workbook_pages_code:
+            errors.append('modReportAnalysis.bas: workbook page-count helper must propagate Ctrl+Break')
+        if 'DoEvents' not in workbook_pages_code:
+            errors.append('modReportAnalysis.bas: workbook page-count helper must yield to Excel')
+
 rename_module = root / 'src' / 'vba' / 'modRenameFiles.bas'
 if rename_module.exists():
     rename_source = rename_module.read_text(encoding='utf-8-sig')
