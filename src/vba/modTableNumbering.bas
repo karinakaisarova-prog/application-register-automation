@@ -41,8 +41,11 @@ Public Sub CheckAndNumberWordTables()
     Dim oldCancelKey As XlEnableCancelKey
     Dim priorWs As Worksheet
     Dim stageWs As Worksheet
+    Dim finalWs As Worksheet
     Dim stageName As String, priorBackupName As String
+    Dim finalStageName As String, finalOldName As String
     Dim reportCommitted As Boolean, priorRenamed As Boolean
+    Dim finalReportCommitted As Boolean, finalOldRenamed As Boolean
 
     If GetRegisterWorkbook() Is Nothing Then
         MsgBox "Сначала запустите StartRegisterAutomation, чтобы создать книгу результата.", vbExclamation, "Книга результата не найдена"
@@ -198,10 +201,13 @@ Public Sub CheckAndNumberWordTables()
     UpdateAllStoryFields wdDoc
     wdDoc.Save
 
-    ' Refresh the preview with the final state.
-    ws.Cells.Clear
-    ws.Range("A1:G1").Value = Array("№ таблицы", "Страница", "Подпись перед таблицей", _
-                                    "Поле SEQ «Таблица»", "Результат проверки", "Путь к отчёту", "Индекс таблицы")
+    ' Build the final-state report on a separate temporary sheet. The current
+    ' preview remains intact until the refreshed report is completely populated.
+    finalStageName = GetUniqueTableAuditSheetName("_tmp_table_final")
+    Set finalWs = GetRegisterWorkbook().Worksheets.Add(After:=GetRegisterWorkbook().Worksheets(GetRegisterWorkbook().Worksheets.Count))
+    finalWs.Name = finalStageName
+    finalWs.Range("A1:G1").Value = Array("№ таблицы", "Страница", "Подпись перед таблицей", _
+                                         "Поле SEQ «Таблица»", "Результат проверки", "Путь к отчёту", "Индекс таблицы")
     r = FIRST_DATA_ROW
     For Each tbl In wdDoc.Tables
         DoEvents
@@ -212,22 +218,39 @@ Public Sub CheckAndNumberWordTables()
         pageNo = tbl.Range.Information(3)
         On Error GoTo Failed
 
-        ws.Cells(r, 1).Value = r - FIRST_DATA_ROW + 1
-        ws.Cells(r, 2).Value = pageNo
-        ws.Cells(r, 3).Value = captionText
-        ws.Cells(r, 4).Value = IIf(hasSeq, "Да", "Нет")
+        finalWs.Cells(r, 1).Value = r - FIRST_DATA_ROW + 1
+        finalWs.Cells(r, 2).Value = pageNo
+        finalWs.Cells(r, 3).Value = captionText
+        finalWs.Cells(r, 4).Value = IIf(hasSeq, "Да", "Нет")
         If hasSeq Then
-            ws.Cells(r, 5).Value = "Нумерация найдена"
+            finalWs.Cells(r, 5).Value = "Нумерация найдена"
         ElseIf IsTableCaptionText(captionText) Then
-            ws.Cells(r, 5).Value = "Подпись без SEQ — проверьте вручную"
+            finalWs.Cells(r, 5).Value = "Подпись без SEQ — проверьте вручную"
         Else
-            ws.Cells(r, 5).Value = "Проверьте вручную"
+            finalWs.Cells(r, 5).Value = "Проверьте вручную"
         End If
-        ws.Cells(r, 6).Value = reportPath
-        ws.Cells(r, 7).Value = r - FIRST_DATA_ROW + 1
+        finalWs.Cells(r, 6).Value = reportPath
+        finalWs.Cells(r, 7).Value = r - FIRST_DATA_ROW + 1
         r = r + 1
     Next tbl
-    FormatTableReport ws, r - 1
+    FormatTableReport finalWs, r - 1
+
+    ' Swap only after the final report is complete; keep the old preview as a
+    ' rollback point until the new sheet has the canonical name.
+    finalOldName = GetUniqueTableAuditSheetName("_bak_table_final")
+    ws.Name = finalOldName
+    finalOldRenamed = True
+    On Error GoTo FinalReportCommitFailed
+    finalWs.Name = TABLE_REPORT_SHEET
+    finalReportCommitted = True
+    Set ws = finalWs
+    Set finalWs = Nothing
+    Application.DisplayAlerts = False
+    GetRegisterWorkbook().Worksheets(finalOldName).Delete
+    finalOldRenamed = False
+    Application.DisplayAlerts = oldAlerts
+    On Error GoTo Failed
+    ws.Activate
 
     MsgBox "Обработка завершена." & vbCrLf & _
            "Подписей добавлено: " & insertedCount & vbCrLf & _
@@ -236,6 +259,20 @@ Public Sub CheckAndNumberWordTables()
            "Итоговый список: лист '" & TABLE_REPORT_SHEET & "'.", _
            vbInformation, "Нумерация таблиц"
     GoTo CleanExit
+
+FinalReportCommitFailed:
+    errText = Err.Description
+    On Error Resume Next
+    If finalOldRenamed And Not ws Is Nothing Then ws.Name = TABLE_REPORT_SHEET
+    If Not finalWs Is Nothing Then
+        Application.DisplayAlerts = False
+        finalWs.Delete
+        Set finalWs = Nothing
+    End If
+    Application.DisplayAlerts = oldAlerts
+    Err.Clear
+    On Error GoTo Failed
+    GoTo Failed
 
 CommitFailed:
     errText = Err.Description
@@ -264,6 +301,15 @@ Failed:
             Application.DisplayAlerts = False
             stageWs.Delete
         End If
+    End If
+    If Not finalWs Is Nothing Then
+        Application.DisplayAlerts = False
+        finalWs.Delete
+        Set finalWs = Nothing
+    End If
+    If finalOldRenamed And Not finalReportCommitted And Not ws Is Nothing Then
+        ws.Name = TABLE_REPORT_SHEET
+        finalOldRenamed = False
     End If
     If priorRenamed And Not priorWs Is Nothing And Not reportCommitted Then
         priorWs.Name = TABLE_REPORT_SHEET
