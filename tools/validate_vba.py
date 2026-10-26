@@ -164,13 +164,6 @@ if rename_module.exists():
     if "Не удалось обновить гиперссылку в строке" not in rename_source or "Err.Raise vbObjectError + 2401" not in rename_source:
         errors.append("modRenameFiles.bas: hyperlink-update failure must trigger rollback")
 
-# File renaming must treat a broken register hyperlink update as a batch failure.
-rename_module = root / "src" / "vba" / "modRenameFiles.bas"
-if rename_module.exists():
-    rename_source = rename_module.read_text(encoding="utf-8-sig")
-    if "Не удалось обновить гиперссылку в строке" not in rename_source or "Err.Raise vbObjectError + 2401" not in rename_source:
-        errors.append("modRenameFiles.bas: hyperlink-update failure must trigger rollback")
-
 # Duplicate application numbers are compared after normalizing leading zeros, while retaining suffixes.
 if list_module.exists():
     duplicate_source = list_module.read_text(encoding='utf-8-sig')
