@@ -263,6 +263,219 @@ if analysis_module.exists():
         if fragment not in analysis_source:
             errors.append(f'modReportAnalysis.bas: required mention-scanning logic missing: {fragment}')
 
+# Page-count helper must propagate Ctrl+Break instead of swallowing it under local Resume Next.
+if analysis_module.exists():
+    workbook_pages_match = re.search(
+        r'Private Function CountWorkbookPrintPages\\b(.*?)^End Function\\s*
+rename_module = root / 'src' / 'vba' / 'modRenameFiles.bas'
+if rename_module.exists():
+    rename_source = rename_module.read_text(encoding='utf-8-sig')
+    rollback_guards = (
+        'For rollbackIndex = renamedItems.Count To 1 Step -1',
+        'Set rollbackItem = renamedItems(rollbackIndex)',
+        'For recoveryIndex = reversedItems.Count To 1 Step -1',
+        'Set item = reversedItems(recoveryIndex)',
+        'Application.EnableCancelKey = xlDisabled',
+    )
+    for fragment in rollback_guards:
+        if fragment not in rename_source:
+            errors.append(f'modRenameFiles.bas: reverse-order recovery logic missing: {fragment}')
+
+    # A no-op first candidate must still reserve its source path, otherwise a
+    # duplicate register row can rename the same physical file a second time.
+    source_claim = rename_source.find('seenSource(oldPath) = r')
+    no_op_check = rename_source.find('If StrComp(oldPath, newPath, vbTextCompare) = 0 Then')
+    if source_claim < 0 or no_op_check < 0 or source_claim > no_op_check:
+        errors.append('modRenameFiles.bas: source path must be claimed before the no-op rename check')
+    if 'имя файла уже соответствует полям перечня; переименование не требуется.' not in rename_source:
+        errors.append('modRenameFiles.bas: no-op rename candidate should be reported as a skipped row')
+
+# Guard table-caption recognition: a SEQ field must be in the nearest non-empty
+# paragraph and the visible paragraph must start with the expected caption label.
+table_module = root / 'src' / 'vba' / 'modTableNumbering.bas'
+if table_module.exists():
+    table_source = table_module.read_text(encoding='utf-8-sig')
+    caption_match = re.search(
+        r'Private Function HasTableSequenceField\b(.*?)^End Function\s*$',
+        table_source, re.I | re.M | re.S
+    )
+    if not caption_match:
+        errors.append('modTableNumbering.bas: HasTableSequenceField function not found')
+    else:
+        caption_code = caption_match.group(1)
+        for fragment in (
+            'Left$(trimmedText, Len("Таблица"))',
+            'StrComp(',
+            'For Each fld In para.Fields',
+            'If Len(trimmedText) > 0 Then',
+        ):
+            if fragment not in caption_code:
+                errors.append('modTableNumbering.bas: caption recognition guard missing: ' + fragment)
+
+# The final Word table audit must be populated on a staging sheet before replacing the preview.
+if table_module.exists():
+    final_report_guards = (
+        'Set finalWs = GetRegisterWorkbook().Worksheets.Add',
+        'FormatTableReport finalWs, r - 1',
+        'ws.Name = finalOldName',
+        'finalWs.Name = TABLE_REPORT_SHEET',
+        'FinalReportCommitFailed:',
+        'If Not finalWs Is Nothing Then',
+        'Deleting the old preview is cleanup, not part of the Word edit transaction.',
+        'If Err.Number = 0 Then',
+    )
+    for fragment in final_report_guards:
+        if fragment not in table_source:
+            errors.append('modTableNumbering.bas: staged final-report replacement guard missing: ' + fragment)
+
+# Guard against creating duplicate captions when a visible manual caption already exists.
+if table_module.exists():
+    for fragment in (
+        'Private Function IsTableCaptionText(',
+        'manualCaptionCount = manualCaptionCount + 1',
+        'Not IsTableCaptionText(captionText)',
+        'para.Information(WD_WITHIN_TABLE) = False',
+    ):
+        if fragment not in table_source:
+            errors.append('modTableNumbering.bas: manual-caption protection missing: ' + fragment)
+
+# Guard the current single-workbook startup design. The startup macro must
+# validate the exact data sheet, assign the selected workbook context, and
+# report a handled error without silently swallowing it. Do not assert resultWb
+# cleanup: this version intentionally does not create a separate result workbook.
+context_module = root / 'src' / 'vba' / 'modWorkbookContext.bas'
+if context_module.exists():
+    context_source = context_module.read_text(encoding='utf-8-sig')
+    startup_guards = (
+        'Set sourceWb = ThisWorkbook',
+        'Set sourceData = sourceWb.Worksheets("data")',
+        'Set gRegisterWorkbook = sourceWb',
+        'CreateMultiFolderApplicationsListCorrected',
+        'failureNumber = Err.Number',
+        'failureDescription = Err.Description',
+    )
+    for fragment in startup_guards:
+        if fragment not in context_source:
+            errors.append(f'modWorkbookContext.bas: single-workbook startup guard missing: {fragment}')
+
+# Required launch points must be externally callable macros, not merely private
+# procedures or functions with the same names.
+required_public_subs = {
+    name.lower()
+    for name in re.findall(
+        r'^\s*Public\s+Sub\s+([A-Za-z_][A-Za-z0-9_]*)\b',
+        '\n'.join(path.read_text(encoding='utf-8-sig') for path in modules),
+        re.I | re.M
+    )
+}
+missing_public = sorted(name for name in required if name.lower() not in required_public_subs)
+if missing_public:
+    errors.append('Required entry points must be Public Sub: ' + ', '.join(missing_public))
+
+missing = sorted(x for x in required if x.lower() not in seen)
+if missing:
+    errors.append('Missing required entry points: ' + ', '.join(missing))
+
+
+# Guard the installer contract: every VBA source module must be listed exactly
+# once in the installer, and the CMD launcher must stay ASCII-only because
+# Windows CMD can misread UTF-8 Cyrillic text depending on the active code page.
+installer_path = root / 'tools' / 'setup_excel.ps1'
+launcher_path = root / 'tools' / 'Установить_книгу_Excel.cmd'
+if installer_path.exists():
+    installer_source = installer_path.read_text(encoding='utf-8-sig')
+    listed_modules = re.findall(r'"(mod[A-Za-z0-9]+\.bas)"', installer_source)
+    expected_modules = sorted(path.name for path in modules)
+    if sorted(listed_modules) != expected_modules:
+        errors.append(
+            'setup_excel.ps1: module list does not match src/vba files; '
+            f'listed={sorted(listed_modules)}, expected={expected_modules}'
+        )
+if launcher_path.exists():
+    launcher_bytes = launcher_path.read_bytes()
+    if any(byte > 127 for byte in launcher_bytes):
+        errors.append('Установить_книгу_Excel.cmd: launcher must remain ASCII-only')
+
+# Keep installer recovery behavior covered by static regression checks.
+if installer_path.exists():
+    for fragment in (
+        '$backupPath = Join-Path',
+        '$convertedOutputCreated = $true',
+        'if (-not $success -and $convertedOutputCreated -and $finalPath -ne $workbookPath)',
+        'Remove-Item -LiteralPath $finalPath -Force -ErrorAction Stop',
+    ):
+        if fragment not in installer_source:
+            errors.append('setup_excel.ps1: installer safety guard missing: ' + fragment)
+
+
+
+# Mixed leading indentation can indicate nested list levels. The bullet fixer
+# must stop before editing such a document instead of flattening those levels.
+bullet_module = root / 'src' / 'vba' / 'modBulletListAudit.bas'
+if bullet_module.exists():
+    bullet_source = bullet_module.read_text(encoding='utf-8-sig')
+    for fragment in (
+        'GetBulletIndentLevel(para, txt)',
+        'If currentIndent <> runIndent Then unsafeGroup = True',
+        'If unsafeGroup Then unsafeGroupsFound = unsafeGroupsFound + 1',
+        'If unsafeGroupsFound > 0 Then',
+        'Автоматическое исправление не выполнено, чтобы не потерять структуру вложенности.',
+        'Private Function GetBulletIndentLevel(ByVal para As Object, ByVal paragraphText As String) As Double',
+        'GetBulletIndentLevel = CDbl(para.Format.LeftIndent)',
+    ):
+        if fragment not in bullet_source:
+            errors.append('modBulletListAudit.bas: nested-list safety guard missing: ' + fragment)
+
+
+# Guard Word-document edits: a same-folder backup must be made before changes,
+# and a failed/cancelled edit must attempt restoration after closing Word.
+for module_name, function_prefix, log_prefix in (
+    ('modTableNumbering.bas', 'CreateWordBackupPath', 'LogTableBackup'),
+    ('modBulletListAudit.bas', 'CreateBulletBackupPath', 'LogBulletBackup'),
+):
+    module_path = root / 'src' / 'vba' / module_name
+    if module_path.exists():
+        module_source = module_path.read_text(encoding='utf-8-sig')
+        recovery_fragments = (
+            'backupPath = ' + function_prefix + '(reportPath)',
+            'FileCopy reportPath, backupPath',
+            'changesStarted = True',
+            'If changesStarted And Len(backupPath) > 0 Then',
+            'If Not wdDoc Is Nothing Then wdDoc.Close False',
+            'If Not wdApp Is Nothing Then wdApp.Quit',
+            'fsoRestore.CopyFile backupPath, reportPath, True',
+            'Автовосстановление не удалось. Резервная копия сохранена:',
+            'Application.EnableCancelKey = oldCancelKey',
+        )
+        for fragment in recovery_fragments:
+            if fragment not in module_source:
+                errors.append(f'{module_name}: Word backup/recovery guard missing: {fragment}')
+        backup_pos = module_source.find('FileCopy reportPath, backupPath')
+        change_pos = module_source.find('changesStarted = True', backup_pos)
+        first_edit_pos = module_source.find('EnsureTableCaptionLabel wdDoc') if module_name == 'modTableNumbering.bas' else module_source.find('wordRange.Delete')
+        if backup_pos < 0 or change_pos < backup_pos or first_edit_pos < 0 or backup_pos > first_edit_pos:
+            # Bullet list edit is inside a later loop; backup must precede its first deletion.
+            errors.append(f'{module_name}: backup must be created before document edits')
+
+print(f'Modules scanned: {len(modules)}; procedures/functions: {sum(len(x) for x in seen.values())}')
+if errors:
+    print('\n'.join('ERROR: ' + x for x in errors))
+    sys.exit(1)
+
+print('PASS: no duplicate procedure names, unmatched procedure endings, or unresolved GoTo labels; required entry points found.')
+print('NOTE: this is static validation, not VBA compilation or Excel/Word runtime testing.')
+,
+        analysis_source, re.I | re.M | re.S
+    )
+    if not workbook_pages_match:
+        errors.append('modReportAnalysis.bas: CountWorkbookPrintPages function not found')
+    else:
+        workbook_pages_code = workbook_pages_match.group(1)
+        if 'If pageBreakError = 18 Then' not in workbook_pages_code or 'Err.Raise pageBreakError' not in workbook_pages_code:
+            errors.append('modReportAnalysis.bas: workbook page-count helper must propagate Ctrl+Break')
+        if 'DoEvents' not in workbook_pages_code:
+            errors.append('modReportAnalysis.bas: workbook page-count helper must yield to Excel')
+
 # Guard transactional recovery for batch file renaming: both failure paths must unwind in reverse order.
 rename_module = root / 'src' / 'vba' / 'modRenameFiles.bas'
 if rename_module.exists():
