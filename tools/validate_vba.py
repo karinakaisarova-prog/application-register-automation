@@ -315,6 +315,12 @@ if rename_module.exists():
         if fragment not in rename_source:
             errors.append(f'modRenameFiles.bas: reverse-order recovery logic missing: {fragment}')
 
+    # A row whose original rename failed must not be falsely marked as rolled back
+    # just because the old path exists and the destination path does not.
+    if 'If Left$(statusText, Len("Ошибка:")) = "Ошибка:" Then' not in rename_source or \
+       'Не требует отката: исходное переименование не выполнено' not in rename_source:
+        errors.append('modRenameFiles.bas: rollback must preserve the distinction between failed renames and actual rollbacks')
+
     # A no-op first candidate must still reserve its source path, otherwise a
     # duplicate register row can rename the same physical file a second time.
     source_claim = rename_source.find('seenSource(oldPath) = r')
