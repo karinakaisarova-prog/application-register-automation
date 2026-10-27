@@ -318,8 +318,15 @@ Public Sub RollbackLastRenameBatch()
             oldPath = CStr(logWs.Cells(r, 4).Value)
             newPath = CStr(logWs.Cells(r, 6).Value)
             If Len(Dir$(oldPath)) > 0 And Len(Dir$(newPath)) = 0 Then
-                ' Filesystem already reflects a completed rollback; reconcile the journal.
-                logWs.Cells(r, 7).Value = "Откатан"
+                ' A failed original rename can also leave oldPath present and newPath absent.
+                ' Do not label that row as rolled back when no rename ever happened.
+                If Left$(statusText, Len("Ошибка:")) = "Ошибка:" Then
+                    logWs.Cells(r, 7).Value = "Не требует отката: исходное переименование не выполнено"
+                    skipped = skipped + 1
+                Else
+                    ' Filesystem already reflects a completed rollback; reconcile the journal.
+                    logWs.Cells(r, 7).Value = "Откатан"
+                End If
             ElseIf Len(Dir$(newPath)) = 0 Or Len(Dir$(oldPath)) > 0 Then
                 logWs.Cells(r, 7).Value = "Откат пропущен: конфликт путей (проверьте оба имени)"
                 skipped = skipped + 1
