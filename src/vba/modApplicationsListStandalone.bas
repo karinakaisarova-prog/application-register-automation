@@ -75,9 +75,10 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
 
     Set mSections = CreateObject("Scripting.Dictionary")
     mSections.CompareMode = vbTextCompare
-    On Error Resume Next
-    Set ws = ThisWorkbook.Worksheets(sheetName)
-    On Error GoTo Failed
+    Set ws = Nothing
+    If WorksheetExists(sheetName) Then
+        Set ws = ThisWorkbook.Worksheets(sheetName)
+    End If
     targetWasExisting = Not ws Is Nothing
     originalSheetName = sheetName
     If targetWasExisting Then
@@ -666,9 +667,10 @@ End Sub
 
 Private Function GetOrCreateSheet(ByVal sheetName As String) As Worksheet
     Dim ws As Worksheet
-    On Error Resume Next
-    Set ws = ThisWorkbook.Worksheets(sheetName)
-    On Error GoTo 0
+    Set ws = Nothing
+    If WorksheetExists(sheetName) Then
+        Set ws = ThisWorkbook.Worksheets(sheetName)
+    End If
     If ws Is Nothing Then
         Set ws = ThisWorkbook.Worksheets.Add(After:=ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count))
         ws.Name = sheetName
