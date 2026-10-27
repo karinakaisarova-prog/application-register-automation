@@ -66,7 +66,7 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
         .AllowMultiSelect = True
         If .Show <> -1 Then GoTo CleanExit
         For Each rootItem In .SelectedItems
-            roots.Add CStr(rootItem)
+            roots.Add NormalizeSelectedRootPath(CStr(rootItem))
         Next rootItem
     End With
 
@@ -695,6 +695,76 @@ Private Function SafeSheetName(ByVal value As String) As String
     If Len(value) = 0 Then value = "Перечень приложений"
     If Len(value) > 31 Then value = Left$(value, 31)
     SafeSheetName = value
+End Function
+
+' FolderPicker normally returns a Windows path for a synchronized SharePoint folder.
+' If a SharePoint HTTP(S) URL reaches this code, convert it to a WebDAV UNC path.
+' WebDAV conversion depends on server configuration and Windows access permissions.
+Private Function NormalizeSelectedRootPath(ByVal selectedPath As String) As String
+    Dim schemeEnd As Long
+    Dim slashAfterHost As Long
+    Dim scheme As String
+    Dim authority As String
+    Dim urlPath As String
+    Dim serverName As String
+    Dim portText As String
+    Dim colonPos As Long
+    Dim webDavServer As String
+
+    selectedPath = Trim$(selectedPath)
+    schemeEnd = InStr(1, selectedPath, "://", vbTextCompare)
+
+    If schemeEnd = 0 Then
+        NormalizeSelectedRootPath = selectedPath
+        Exit Function
+    End If
+
+    scheme = LCase$(Left$(selectedPath, schemeEnd - 1))
+    If scheme <> "http" And scheme <> "https" Then
+        NormalizeSelectedRootPath = selectedPath
+        Exit Function
+    End If
+
+    slashAfterHost = InStr(schemeEnd + 3, selectedPath, "/")
+    If slashAfterHost = 0 Then
+        authority = Mid$(selectedPath, schemeEnd + 3)
+        urlPath = ""
+    Else
+        authority = Mid$(selectedPath, schemeEnd + 3, slashAfterHost - (schemeEnd + 3))
+        urlPath = Mid$(selectedPath, slashAfterHost + 1)
+    End If
+
+    ' Remove query strings or fragments if supplied, then decode common spaces.
+    If InStr(urlPath, "?") > 0 Then urlPath = Left$(urlPath, InStr(urlPath, "?") - 1)
+    If InStr(urlPath, "#") > 0 Then urlPath = Left$(urlPath, InStr(urlPath, "#") - 1)
+    urlPath = Replace(urlPath, "%20", " ")
+    urlPath = Replace(urlPath, "/", "\")
+
+    serverName = authority
+    portText = ""
+    colonPos = InStrRev(authority, ":")
+    If colonPos > 0 Then
+        serverName = Left$(authority, colonPos - 1)
+        portText = Mid$(authority, colonPos + 1)
+    End If
+
+    If Len(serverName) = 0 Then
+        NormalizeSelectedRootPath = selectedPath
+        Exit Function
+    End If
+
+    webDavServer = serverName
+    If scheme = "https" Then
+        webDavServer = webDavServer & "@SSL"
+        If Len(portText) > 0 And portText <> "443" Then webDavServer = webDavServer & "@" & portText
+    Else
+        If Len(portText) > 0 And portText <> "80" Then webDavServer = webDavServer & "@" & portText
+    End If
+
+    NormalizeSelectedRootPath = "\" & webDavServer & "DavWWWRoot"
+    If Len(urlPath) > 0 Then NormalizeSelectedRootPath = NormalizeSelectedRootPath & "" & urlPath
+
+    LogLine "Адрес SharePoint преобразован в путь Windows WebDAV: " & NormalizeSelectedRootPath
 End Function
 
 Private Function GetFolderName(ByVal folderPath As String) As String
