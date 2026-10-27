@@ -77,7 +77,7 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
     mSections.CompareMode = vbTextCompare
     Set ws = Nothing
     If WorksheetExists(sheetName) Then
-        Set ws = ThisWorkbook.Worksheets(sheetName)
+        Set ws = FindWorksheet(sheetName)
     End If
     targetWasExisting = Not ws Is Nothing
     originalSheetName = sheetName
@@ -192,7 +192,7 @@ Failed:
         Set ws = Nothing
         If Len(Trim$(sheetName)) > 0 Then
             On Error Resume Next
-            Set ws = ThisWorkbook.Worksheets(sheetName)
+            Set ws = FindWorksheet(sheetName)
             On Error GoTo 0
         End If
         If Not ws Is Nothing Then
@@ -677,7 +677,7 @@ Private Function GetOrCreateSheet(ByVal sheetName As String) As Worksheet
     Dim ws As Worksheet
     Set ws = Nothing
     If WorksheetExists(sheetName) Then
-        Set ws = ThisWorkbook.Worksheets(sheetName)
+        Set ws = FindWorksheet(sheetName)
     End If
     If ws Is Nothing Then
         Set ws = ThisWorkbook.Worksheets.Add(After:=ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count))
@@ -689,10 +689,17 @@ End Function
 Private Function WorksheetExists(ByVal sheetName As String) As Boolean
     Dim ws As Worksheet
     On Error Resume Next
-    Set ws = ThisWorkbook.Worksheets(sheetName)
+    Set ws = FindWorksheet(sheetName)
     WorksheetExists = Not ws Is Nothing
-    On Error GoTo 0
 End Function
+
+Private Function FindWorksheet(ByVal sheetName As String) As Worksheet
+    Dim foundSheet As Worksheet
+    If Len(Trim$(sheetName)) = 0 Then Exit Function
+    On Error Resume Next
+    Set foundSheet = ThisWorkbook.Worksheets(sheetName)
+    On Error GoTo 0
+    Set FindWorksheet = foundSheet
 
 Private Function SafeSheetName(ByVal value As String) As String
     Dim invalidChars As Variant
