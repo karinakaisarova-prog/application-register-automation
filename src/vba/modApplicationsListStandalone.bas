@@ -190,8 +190,16 @@ Failed:
         End If
     ElseIf Not targetWasExisting Then
         Set ws = Nothing
-        Set ws = ThisWorkbook.Worksheets(sheetName)
-        If Not ws Is Nothing Then ws.Delete
+        If Len(Trim$(sheetName)) > 0 Then
+            On Error Resume Next
+            Set ws = ThisWorkbook.Worksheets(sheetName)
+            On Error GoTo 0
+        End If
+        If Not ws Is Nothing Then
+            Application.DisplayAlerts = False
+            ws.Delete
+            Application.DisplayAlerts = True
+        End If
         LogLine "Новый неполный лист удалён."
     End If
     Application.StatusBar = False
