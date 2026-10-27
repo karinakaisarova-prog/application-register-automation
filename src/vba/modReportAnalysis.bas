@@ -329,7 +329,11 @@ FileFailed:
         GoTo Failed
     End If
     failed = failed + 1
-    ws.Cells(r, 10).Value = "Ошибка чтения"
+    If Err.Number = vbObjectError + 2501 Then
+        ws.Cells(r, 10).Value = "Не удалось определить страницы Excel: проверьте принтер и параметры печати"
+    Else
+        ws.Cells(r, 10).Value = "Ошибка чтения"
+    End If
     On Error Resume Next
     If Not wdDoc Is Nothing Then wdDoc.Close False
     Set wdDoc = Nothing
@@ -426,12 +430,13 @@ Private Function CountWorkbookPrintPages(ByVal wb As Workbook) As Long
         pageBreakDescription = Err.Description
         On Error GoTo 0
 
-        ' Do not let the local best-effort page-break handling swallow Ctrl+Break.
+        ' Do not report a fabricated one-page result when Excel cannot calculate
+        ' print breaks (commonly because no usable printer is configured).
         If pageBreakError = 18 Then
             Err.Raise pageBreakError, "CountWorkbookPrintPages", pageBreakDescription
         ElseIf pageBreakError <> 0 Then
-            h = 1
-            v = 1
+            Err.Raise vbObjectError + 2501, "CountWorkbookPrintPages", _
+                      "Excel не смог рассчитать разрывы страниц листа '" & sh.Name & "': " & pageBreakDescription
         End If
 
         If Application.WorksheetFunction.CountA(sh.UsedRange) > 0 Then total = total + (h * v)
