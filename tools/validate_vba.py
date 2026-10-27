@@ -164,7 +164,7 @@ if list_module.exists():
     sharepoint_guards = (
         'roots.Add NormalizeSelectedRootPath(CStr(rootItem))',
         'Private Function NormalizeSelectedRootPath(ByVal selectedPath As String) As String',
-        'urlPath = Replace(urlPath, "/", "\\\\")',
+        'urlPath = Replace(urlPath, "/", "\\")',
         'If Len(GetFolderName) = 0 Then',
     )
     for fragment in sharepoint_guards:
