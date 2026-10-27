@@ -769,8 +769,26 @@ End Function
 
 Private Function GetFolderName(ByVal folderPath As String) As String
     Dim fso As Object
+    Dim normalizedPath As String
+    Dim separatorPos As Long
+
+    normalizedPath = RemoveTrailingSlash(Trim$(folderPath))
+    On Error Resume Next
     Set fso = CreateObject("Scripting.FileSystemObject")
-    GetFolderName = fso.GetFolder(RemoveTrailingSlash(folderPath)).Name
+    If Not fso Is Nothing Then GetFolderName = fso.GetFolder(normalizedPath).Name
+    On Error GoTo 0
+
+    ' A WebDAV location may be inaccessible when the sheet name is derived.
+    ' Fall back to the final path segment so the later scan can log the real access error.
+    If Len(GetFolderName) = 0 Then
+        normalizedPath = Replace(normalizedPath, "/", "\")
+        separatorPos = InStrRev(normalizedPath, "\")
+        If separatorPos > 0 And separatorPos < Len(normalizedPath) Then
+            GetFolderName = Mid$(normalizedPath, separatorPos + 1)
+        Else
+            GetFolderName = normalizedPath
+        End If
+    End If
 End Function
 
 Private Function RemoveTrailingSlash(ByVal value As String) As String
