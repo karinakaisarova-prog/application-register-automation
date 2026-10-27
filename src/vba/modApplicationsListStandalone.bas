@@ -757,7 +757,7 @@ Private Function NormalizeSelectedRootPath(ByVal selectedPath As String) As Stri
     If InStr(urlPath, "?") > 0 Then urlPath = Left$(urlPath, InStr(urlPath, "?") - 1)
     If InStr(urlPath, "#") > 0 Then urlPath = Left$(urlPath, InStr(urlPath, "#") - 1)
     urlPath = Replace(urlPath, "%20", " ")
-    urlPath = Replace(urlPath, "/", "\\")
+    urlPath = Replace(urlPath, "/", "\")
 
     serverName = authority
     portText = ""
