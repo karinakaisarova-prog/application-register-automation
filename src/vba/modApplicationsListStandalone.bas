@@ -700,6 +700,7 @@ Private Function FindWorksheet(ByVal sheetName As String) As Worksheet
     Set foundSheet = ThisWorkbook.Worksheets(sheetName)
     On Error GoTo 0
     Set FindWorksheet = foundSheet
+End Function
 
 Private Function SafeSheetName(ByVal value As String) As String
     Dim invalidChars As Variant
