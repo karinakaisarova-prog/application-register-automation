@@ -300,6 +300,10 @@ if analysis_module.exists():
             errors.append('modReportAnalysis.bas: workbook page-count helper must propagate Ctrl+Break')
         if 'DoEvents' not in workbook_pages_code:
             errors.append('modReportAnalysis.bas: workbook page-count helper must yield to Excel')
+        if 'Err.Raise vbObjectError + 2501' not in workbook_pages_code or 'h = 1' in workbook_pages_code or 'v = 1' in workbook_pages_code:
+            errors.append('modReportAnalysis.bas: do not report a fabricated one-page Excel result when print-break calculation fails')
+    if 'Не удалось определить страницы Excel: проверьте принтер и параметры печати' not in analysis_source:
+        errors.append('modReportAnalysis.bas: Excel print-break failure must be visible in the page-count result')
 
 rename_module = root / 'src' / 'vba' / 'modRenameFiles.bas'
 if rename_module.exists():
