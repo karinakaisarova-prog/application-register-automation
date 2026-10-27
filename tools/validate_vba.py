@@ -157,6 +157,20 @@ if list_module.exists():
     if not file_loop or 'DoEvents' not in file_loop.group(1) or 'Application.StatusBar' not in file_loop.group(1):
         errors.append('modApplicationsList.bas: file scan must yield to Excel and update progress inside the file loop')
 
+# Guard SharePoint path normalization: keep ordinary Windows paths unchanged,
+# convert HTTP(S) roots to WebDAV UNC, and use VBA's single-backslash separator.
+if list_module.exists():
+    sharepoint_source = list_module.read_text(encoding='utf-8-sig')
+    sharepoint_guards = (
+        'roots.Add NormalizeSelectedRootPath(CStr(rootItem))',
+        'Private Function NormalizeSelectedRootPath(ByVal selectedPath As String) As String',
+        'urlPath = Replace(urlPath, "/", "\\\\")',
+        'If Len(GetFolderName) = 0 Then',
+    )
+    for fragment in sharepoint_guards:
+        if fragment not in sharepoint_source:
+            errors.append('modApplicationsList.bas: SharePoint path handling missing or malformed: ' + fragment)
+
 # File renaming must treat a broken register hyperlink update as a batch failure.
 rename_module = root / "src" / "vba" / "modRenameFiles.bas"
 if rename_module.exists():
