@@ -10,7 +10,7 @@
 
 ## Дополнительный самостоятельный вариант
 
-Файл [`examples/modApplicationsListStandalone.bas`](examples/modApplicationsListStandalone.bas) содержит отдельный вариант только для формирования перечня. Он не входит в установщик и **не должен импортироваться вместе с `src/vba/modApplicationsList.bas`**, поскольку оба варианта содержат одноимённую процедуру запуска. Для обычной установки используйте девять модулей из `src/vba/`.
+Файл [`examples/modApplicationsListStandalone.bas`](examples/modApplicationsListStandalone.bas) содержит отдельный вариант только для формирования перечня. Он не входит в установщик и **не должен импортироваться вместе с `src/vba/modApplicationsList.bas`**, поскольку оба варианта содержат одноимённую процедуру запуска. Для обычной установки используйте девять модулей из `src/vba/`. Файл [`examples/ApplicationRegister_AllInOne.bas`](examples/ApplicationRegister_AllInOne.bas) — архивный объединённый вариант всего набора; он также не входит в установщик и **не должен импортироваться вместе с девятью основными модулями**, так как содержит их процедуры повторно.
 
 ## Модули VBA
 
