@@ -72,8 +72,8 @@ Public Function GetRegisterWorkbook() As Workbook
         Exit Function
     End If
 
-    ' A direct macro launch can have the workbook with data active while
-    ' ThisWorkbook points to PERSONAL.XLSB or another macro container.
+    ' При прямом запуске активной может быть книга с данными, а
+    ' ThisWorkbook — указывать на PERSONAL.XLSB или другую книгу с макросами.
     Set ws = Nothing
     If Not ActiveWorkbook Is Nothing Then
         On Error Resume Next
@@ -86,8 +86,8 @@ Public Function GetRegisterWorkbook() As Workbook
         End If
     End If
 
-    ' Search all open workbooks for the exact data sheet before using a
-    ' workbook identified only by a previous register.
+    ' Сначала ищет лист data во всех открытых книгах и только потом использует
+    ' книгу, определённую по ранее созданному перечню.
     For Each wb In Application.Workbooks
         Set ws = Nothing
         On Error Resume Next
