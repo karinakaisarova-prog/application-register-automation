@@ -61,7 +61,8 @@ Public Function GetRegisterWorkbook() As Workbook
     Err.Clear
     On Error GoTo 0
 
-    ' The macro workbook is the intended home for the data sheet and register.
+    ' If macros are launched directly, prefer ThisWorkbook when it contains data.
+    Set ws = Nothing
     On Error Resume Next
     Set ws = ThisWorkbook.Worksheets("data")
     On Error GoTo 0
@@ -71,7 +72,35 @@ Public Function GetRegisterWorkbook() As Workbook
         Exit Function
     End If
 
-    ' Fallback after a VBA reset: identify a workbook by the register title/header.
+    ' A direct macro launch can have the workbook with data active while
+    ' ThisWorkbook points to PERSONAL.XLSB or another macro container.
+    Set ws = Nothing
+    If Not ActiveWorkbook Is Nothing Then
+        On Error Resume Next
+        Set ws = ActiveWorkbook.Worksheets("data")
+        On Error GoTo 0
+        If Not ws Is Nothing Then
+            Set gRegisterWorkbook = ActiveWorkbook
+            Set GetRegisterWorkbook = ActiveWorkbook
+            Exit Function
+        End If
+    End If
+
+    ' Search all open workbooks for the exact data sheet before using a
+    ' workbook identified only by a previous register.
+    For Each wb In Application.Workbooks
+        Set ws = Nothing
+        On Error Resume Next
+        Set ws = wb.Worksheets("data")
+        On Error GoTo 0
+        If Not ws Is Nothing Then
+            Set gRegisterWorkbook = wb
+            Set GetRegisterWorkbook = wb
+            Exit Function
+        End If
+    Next wb
+
+    ' Last fallback after a VBA reset: identify an existing register.
     For Each wb In Application.Workbooks
         For Each ws In wb.Worksheets
             If CStr(ws.Range("A1").Value) = "Перечень приложений" Or _
@@ -82,6 +111,9 @@ Public Function GetRegisterWorkbook() As Workbook
             End If
         Next ws
     Next wb
+
+    Err.Raise vbObjectError + 2101, "GetRegisterWorkbook", _
+              "Не удалось определить книгу для перечня. Откройте книгу с листом 'data' и запустите макрос из неё."
 End Function
 
 Public Function GetActiveRegisterSheet() As Worksheet
