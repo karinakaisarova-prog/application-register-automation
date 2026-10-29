@@ -1,7 +1,7 @@
 Attribute VB_Name = "modSafetySupport"
 Option Explicit
 
-' Common cancellation/error helpers for macros that use Excel and Word automation.
+' Общие вспомогательные процедуры отмены и обработки ошибок для макросов Excel и Word.
 Public Function IsUserCancellation(ByVal errorNumber As Long) As Boolean
     IsUserCancellation = (errorNumber = 18)
 End Function
