@@ -2,13 +2,7 @@ Attribute VB_Name = "modApplicationsList"
 Option Explicit
 Option Private Module
 
-' Основной модуль формирования перечня приложений.
-' Пользовательский запуск выполняется через StartRegisterAutomation.
-' Повторное формирование — кнопкой «Повторно создать перечень» на панели.
-' Дополнительные ссылки VBA не требуются.
-' Глубина поиска — до MAX_FOLDER_DEPTH уровней вложенности.
-' Ручные значения в столбце H («Раздел») сохраняются по полному пути файла.
-' Закрепление областей не используется.
+' Формирует перечень приложений в текущей книге Excel.
 
 Private Const HEADER_ROW As Long = 2
 Private Const FIRST_DATA_ROW As Long = 3
