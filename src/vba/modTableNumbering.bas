@@ -77,8 +77,8 @@ Public Sub CheckAndNumberWordTables()
     wdApp.Visible = False
     Set wdDoc = wdApp.Documents.Open(reportPath, False, False, False)
 
-    ' Build the new report on a temporary sheet. Keep the previous report intact
-    ' until the scan has completed successfully.
+    ' Формирует новый отчёт на временном листе и сохраняет предыдущий отчёт
+    ' до успешного завершения проверки.
     On Error Resume Next
     Set priorWs = GetRegisterWorkbook().Worksheets(TABLE_REPORT_SHEET)
     On Error GoTo Failed
@@ -201,8 +201,8 @@ Public Sub CheckAndNumberWordTables()
     UpdateAllStoryFields wdDoc
     wdDoc.Save
 
-    ' Build the final-state report on a separate temporary sheet. The current
-    ' preview remains intact until the refreshed report is completely populated.
+    ' Формирует окончательный отчёт на отдельном временном листе. Текущий
+    ' предварительный отчёт сохраняется, пока новый не будет полностью заполнен.
     finalStageName = GetUniqueTableAuditSheetName("_tmp_table_final")
     Set finalWs = GetRegisterWorkbook().Worksheets.Add(After:=GetRegisterWorkbook().Worksheets(GetRegisterWorkbook().Worksheets.Count))
     finalWs.Name = finalStageName
@@ -235,8 +235,8 @@ Public Sub CheckAndNumberWordTables()
     Next tbl
     FormatTableReport finalWs, r - 1
 
-    ' Swap only after the final report is complete; keep the old preview as a
-    ' rollback point until the new sheet has the canonical name.
+    ' Заменяет листы только после подготовки окончательного отчёта; сохраняет старый
+    ' отчёт как резервную копию, пока новый лист не получит основное имя.
     finalOldName = GetUniqueTableAuditSheetName("_bak_table_final")
     ws.Name = finalOldName
     finalOldRenamed = True
@@ -246,9 +246,9 @@ Public Sub CheckAndNumberWordTables()
     Set ws = finalWs
     Set finalWs = Nothing
     Application.DisplayAlerts = False
-    ' Deleting the old preview is cleanup, not part of the Word edit transaction.
-    ' If Excel refuses to delete it, keep the backup sheet rather than restoring
-    ' the Word file after the final report has already been committed.
+    ' Удаление старого предварительного отчёта — завершающая очистка, а не часть изменения документа Word.
+    ' Если Excel не позволяет удалить лист, сохраняет его как резервную копию и не восстанавливает
+    ' исходный документ Word после сохранения итогового отчёта.
     On Error Resume Next
     GetRegisterWorkbook().Worksheets(finalOldName).Delete
     If Err.Number = 0 Then
@@ -361,8 +361,8 @@ Private Sub InsertCustomTableCaption(ByVal wdApp As Object, ByVal wdDoc As Objec
     Dim captionEnd As Long
     Dim foundSeq As Boolean
 
-    ' Let Word create a real caption paragraph above the table, then change its
-    ' SEQ field format so the field itself displays "Таблица № 1", etc.
+    ' Просит Word создать настоящий абзац подписи над таблицей, затем меняет формат
+    ' поля SEQ, чтобы оно отображало «Таблица № 1» и последующие номера.
     tbl.Range.Select
     wdApp.Selection.InsertCaption "Таблица", "", , WD_CAPTION_POSITION_ABOVE, ""
 
@@ -376,8 +376,8 @@ Private Sub InsertCustomTableCaption(ByVal wdApp As Object, ByVal wdDoc As Objec
     For Each fld In captionPara.Fields
         If InStr(1, CStr(fld.Code.Text), "SEQ", vbTextCompare) > 0 And _
            InStr(1, CStr(fld.Code.Text), "ТАБЛИЦА", vbTextCompare) > 0 Then
-            ' Remove Word's literal label before the field; the field format
-            ' supplies the complete visible caption.
+            ' Удаляет обычный текст подписи перед полем: формат поля
+            ' задаёт полный вид подписи.
             If fld.Range.Start > captionPara.Start Then
                 Set prefixRange = wdDoc.Range(captionPara.Start, fld.Range.Start)
                 prefixRange.Text = ""
@@ -455,9 +455,9 @@ Private Function HasTableSequenceField(ByVal wdDoc As Object, ByVal tableStart A
     Dim paraText As String
     Dim trimmedText As String
 
-    ' Skip a few empty paragraphs, then inspect only the nearest non-empty
-    ' paragraph. A SEQ field alone is not enough: it must be in a caption-like
-    ' paragraph beginning with the visible label "Таблица".
+    ' Пропускает пустые абзацы и проверяет ближайший непустой
+    ' абзац. Наличия поля SEQ недостаточно: оно должно находиться в подписи,
+    ' начинающейся с видимого слова «Таблица».
     For paraIndex = wdDoc.Paragraphs.Count To 1 Step -1
         Set para = wdDoc.Paragraphs(paraIndex).Range
         If para.Start >= tableStart Or para.Information(WD_WITHIN_TABLE) Then
