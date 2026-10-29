@@ -54,7 +54,7 @@ Public Sub CreateRegisterControlPanel(ByVal ws As Worksheet)
         "Обновить панель")
 
     macroNames = Array( _
-        "CreateMultiFolderApplicationsListCorrected", _
+        "CreateApplicationsRegister", _
         "ScanWordReportMentions", _
         "CountPagesForRegister", _
         "BuildDataFull", _
