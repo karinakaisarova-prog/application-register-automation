@@ -49,7 +49,7 @@ Public Function GetRegisterWorkbook() As Workbook
     Dim wb As Workbook
     Dim ws As Worksheet
 
-    ' Prefer the workbook explicitly selected by the startup procedure.
+    ' В первую очередь использует книгу, явно выбранную процедурой запуска.
     On Error Resume Next
     If Not gRegisterWorkbook Is Nothing Then
         Set ws = gRegisterWorkbook.Worksheets(1)
@@ -61,7 +61,7 @@ Public Function GetRegisterWorkbook() As Workbook
     Err.Clear
     On Error GoTo 0
 
-    ' If macros are launched directly, prefer ThisWorkbook when it contains data.
+    ' При прямом запуске макроса в первую очередь использует ThisWorkbook, если в ней есть исходные данные.
     Set ws = Nothing
     On Error Resume Next
     Set ws = ThisWorkbook.Worksheets("data")
@@ -100,7 +100,7 @@ Public Function GetRegisterWorkbook() As Workbook
         End If
     Next wb
 
-    ' Last fallback after a VBA reset: identify an existing register.
+    ' Последний вариант после сброса VBA — найти книгу с уже созданным перечнем.
     For Each wb In Application.Workbooks
         For Each ws In wb.Worksheets
             If CStr(ws.Range("A1").Value) = "Перечень приложений" Or _
