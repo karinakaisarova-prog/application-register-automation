@@ -113,8 +113,8 @@ Public Sub ScanWordReportMentions()
             On Error GoTo Failed
 
             For Each mt In matches
-                ' Resolve the page from the exact match range, not the paragraph
-                ' end: one long paragraph can contain mentions on different pages.
+                ' Определяет страницу по точному диапазону совпадения, а не по концу абзаца:
+                ' в одном длинном абзаце могут быть упоминания на разных страницах.
                 Set rng = wdDoc.Range(para.Range.Start + CLng(mt.FirstIndex), _
                                       para.Range.Start + CLng(mt.FirstIndex) + CLng(mt.Length))
                 pageNo = CLng(rng.Information(1)) ' wdActiveEndAdjustedPageNumber: page number as displayed in Word
@@ -307,8 +307,8 @@ Public Sub CountPagesForRegister()
             ws.Cells(r, 10).Value = "Файл не найден"
             failed = failed + 1
         Else
-            ' Do not leave a stale page count from an earlier run when the
-            ' register row has no usable hyperlink/path.
+            ' Не оставляет количество страниц от предыдущего запуска, если
+            ' в строке перечня нет действующей ссылки или пути к файлу.
             ws.Cells(r, 10).Value = "Нет ссылки на файл"
             failed = failed + 1
         End If
@@ -430,8 +430,8 @@ Private Function CountWorkbookPrintPages(ByVal wb As Workbook) As Long
         pageBreakDescription = Err.Description
         On Error GoTo 0
 
-        ' Do not report a fabricated one-page result when Excel cannot calculate
-        ' print breaks (commonly because no usable printer is configured).
+        ' Не указывает условную одну страницу, если Excel не может определить
+        ' разрывы страниц (например, когда не настроен доступный принтер).
         If pageBreakError = 18 Then
             Err.Raise pageBreakError, "CountWorkbookPrintPages", pageBreakDescription
         ElseIf pageBreakError <> 0 Then
