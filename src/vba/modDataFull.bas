@@ -1,9 +1,9 @@
 Attribute VB_Name = "modDataFull"
 Option Explicit
 
-' Builds a unique list of Section + Responsible Person pairs from the active register.
-' Source columns: F = Responsible Person, H = Section; headers are on row 2, data starts on row 3.
-' Output sheet: data_full. Blank values are ignored.
+' Формирует список уникальных сочетаний раздела и ответственного лица из текущего перечня.
+' Источник: столбец F — ответственное лицо, столбец H — раздел; заголовки находятся во второй строке, данные — с третьей.
+' Результат записывается на лист data_full. Пустые значения пропускаются.
 
 Private Const SOURCE_FIRST_ROW As Long = 3
 Private Const COL_RESPONSIBLE As Long = 6
@@ -80,7 +80,7 @@ Public Sub BuildDataFull()
     On Error GoTo Failed
     outputWasExisting = Not outputWs Is Nothing
 
-    ' Keep a full worksheet copy until the rebuild has completed successfully.
+    ' Сохраняет полную копию листа, пока перестроение не завершится успешно.
     If outputWasExisting Then
         outputWs.Copy After:=GetRegisterWorkbook().Worksheets(GetRegisterWorkbook().Worksheets.Count)
         Set backupWs = ActiveSheet
@@ -142,7 +142,7 @@ Failed:
     failureText = Err.Description
     wasCancelled = (Err.Number = 18)
 
-    ' Restore the previous output if an error or Ctrl+Break occurs mid-rebuild.
+    ' Восстанавливает предыдущий результат, если во время перестроения возникла ошибка или пользователь прервал выполнение.
     On Error Resume Next
     Application.DisplayAlerts = False
     If Not backupWs Is Nothing Then
