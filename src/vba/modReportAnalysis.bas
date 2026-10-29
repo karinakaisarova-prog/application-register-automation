@@ -1,9 +1,9 @@
 Attribute VB_Name = "modReportAnalysis"
 Option Explicit
 
-' Word report analysis. Uses late binding; Microsoft Word must be installed.
-' Results are written to worksheet "Упоминания отчёта".
-' This module does not modify the source report.
+' Анализирует упоминания приложений в отчёте Word. Для выполнения требуется Microsoft Word.
+' Результаты записываются на лист «Упоминания отчёта».
+' Исходный отчёт не изменяется.
 
 Private Const RESULT_SHEET As String = "Упоминания отчёта"
 Private Const FIRST_RESULT_ROW As Long = 2
@@ -66,7 +66,7 @@ Public Sub ScanWordReportMentions()
     wdApp.Visible = False
     Set wdDoc = wdApp.Documents.Open(reportPath, False, True, False)
 
-    ' Preserve previous results until the new scan completes successfully.
+    ' Сохраняет предыдущий результат, пока новая проверка не завершится успешно.
     On Error Resume Next
     Set ws = GetRegisterWorkbook().Worksheets(RESULT_SHEET)
     On Error GoTo Failed
@@ -155,7 +155,7 @@ Failed:
     If Not wdDoc Is Nothing Then wdDoc.Close False
     If Not wdApp Is Nothing Then wdApp.Quit
 
-    ' Roll back the output sheet so a failed/cancelled scan cannot leave partial results.
+    ' Восстанавливает прежний лист результата, чтобы после ошибки или отмены не осталось неполных данных.
     If Not backupWs Is Nothing Then
         Application.DisplayAlerts = False
         Set damagedWs = ws
@@ -262,7 +262,7 @@ Public Sub CountPagesForRegister()
         GoTo CleanExit
     End If
 
-    ' Keep the original page-count column so Ctrl+Break or a fatal error can roll back.
+    ' Сохраняет исходный столбец с количеством страниц, чтобы восстановить его при прерывании или критической ошибке.
     oldPageValues = ws.Range("J3:J" & lastRow).Formula
     pageSnapshotTaken = True
 
@@ -325,7 +325,7 @@ NextRow:
 
 FileFailed:
     If Err.Number = 18 Then
-        ' Ctrl+Break must reach the top-level handler so Excel state is restored.
+        ' Прерывание Ctrl+Break должно дойти до основного обработчика, чтобы восстановить настройки Excel.
         GoTo Failed
     End If
     failed = failed + 1
@@ -404,7 +404,7 @@ PdfUnavailable:
     Set pdfDoc = Nothing
     On Error GoTo 0
 
-    ' Do not swallow Ctrl+Break: let the caller restore the page-count snapshot.
+    ' Не подавляет Ctrl+Break: вызывающая процедура должна восстановить сохранённые значения количества страниц.
     If savedErrNumber = 18 Then
         Err.Raise savedErrNumber, "CountPdfPagesWithAcrobat", savedErrDescription
     End If
