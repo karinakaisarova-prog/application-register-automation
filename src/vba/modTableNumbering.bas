@@ -1,10 +1,10 @@
 Attribute VB_Name = "modTableNumbering"
 Option Explicit
 
-' Checks every table exposed by Word's document Tables collection.
-' Produces a preview on an Excel sheet before modifying the Word document.
-' Missing captions are inserted as Word SEQ fields, then document fields are updated.
-' Word is automated late-bound; Microsoft Word must be installed.
+' Проверяет все таблицы документа Word.
+' Перед изменением документа формирует предварительный отчёт на листе Excel.
+' Для таблиц без подписи добавляет автоматические поля SEQ Word и обновляет поля документа.
+' Для выполнения требуется Microsoft Word.
 
 Private Const TABLE_REPORT_SHEET As String = "Проверка таблиц"
 Private Const FIRST_DATA_ROW As Long = 2
@@ -121,7 +121,7 @@ Public Sub CheckAndNumberWordTables()
 
     FormatTableReport ws, r - 1
 
-    ' Commit only after the scan and formatting are complete.
+    ' Заменяет предыдущий отчёт только после завершения проверки и форматирования.
     If Not priorWs Is Nothing Then
         priorBackupName = GetUniqueTableAuditSheetName("_bak_table_audit")
         priorWs.Name = priorBackupName
@@ -176,7 +176,7 @@ Public Sub CheckAndNumberWordTables()
         GoTo CleanExit
     End If
 
-    ' Create a same-folder backup only after the user confirms the proposed changes.
+    ' Создаёт резервную копию в той же папке только после подтверждения изменений пользователем.
     backupPath = CreateWordBackupPath(reportPath)
     FileCopy reportPath, backupPath
     LogTableBackup ws, backupPath
@@ -184,7 +184,7 @@ Public Sub CheckAndNumberWordTables()
 
     EnsureTableCaptionLabel wdDoc
 
-    ' Iterate backwards so inserting captions does not disturb positions of tables not yet processed.
+    ' Обрабатывает таблицы с конца документа, чтобы вставка подписей не смещала расположение ещё не проверенных таблиц.
     For r = tableCount To 1 Step -1
         DoEvents
         Set tbl = wdDoc.Tables(r)
@@ -461,7 +461,7 @@ Private Function HasTableSequenceField(ByVal wdDoc As Object, ByVal tableStart A
     For paraIndex = wdDoc.Paragraphs.Count To 1 Step -1
         Set para = wdDoc.Paragraphs(paraIndex).Range
         If para.Start >= tableStart Or para.Information(WD_WITHIN_TABLE) Then
-            ' Skip the current table and paragraphs inside any earlier table.
+            ' Пропускает текущую таблицу и абзацы внутри предыдущих таблиц.
         ElseIf para.End <= tableStart Then
             checkedParagraphs = checkedParagraphs + 1
             paraText = CStr(para.Text)
@@ -499,7 +499,7 @@ Private Function GetPreviousCaptionText(ByVal wdDoc As Object, ByVal tableStart 
     For paraIndex = wdDoc.Paragraphs.Count To 1 Step -1
         Set para = wdDoc.Paragraphs(paraIndex).Range
         If para.Start >= tableStart Then
-            ' Skip paragraphs at or inside the current table.
+            ' Пропускает абзацы, расположенные в текущей таблице или внутри неё.
         ElseIf para.End <= tableStart Then
             If para.Information(WD_WITHIN_TABLE) = False Then
                 checkedParagraphs = checkedParagraphs + 1
