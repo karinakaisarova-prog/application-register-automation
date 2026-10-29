@@ -1,9 +1,9 @@
 Attribute VB_Name = "modBulletListAudit"
 Option Explicit
 
-' Finds consecutive paragraphs that use typed dash/bullet characters instead of
-' Word's native list formatting. Shows a preview before any edits.
-' Tests should be run on a copy of the report. Microsoft Word must be installed.
+' Находит последовательности абзацев с напечатанными тире или маркерами вместо
+' настоящего форматирования списков Word. Перед изменениями показывает предварительный отчёт.
+' Проверяйте работу на копии отчёта. Для выполнения требуется Microsoft Word.
 
 Private Const BULLET_REPORT_SHEET As String = "Проверка списков"
 Private Const FIRST_DATA_ROW As Long = 2
@@ -68,7 +68,7 @@ Public Sub CheckAndFixWordBulletLists()
     wdApp.Visible = False
     Set wdDoc = wdApp.Documents.Open(reportPath, False, False, False)
 
-    ' Scan into a staging sheet so interruption cannot erase the previous report.
+    ' Сначала формирует отчёт на временном листе, чтобы при прерывании не потерять предыдущий отчёт.
     On Error Resume Next
     Set priorWs = GetRegisterWorkbook().Worksheets(BULLET_REPORT_SHEET)
     On Error GoTo Failed
@@ -109,7 +109,7 @@ Public Sub CheckAndFixWordBulletLists()
                 runEnd = j - 1
                 runLength = runEnd - runStart + 1
 
-                ' Avoid converting isolated dash-led paragraphs: they may be ordinary prose.
+                ' Не преобразует одиночные абзацы с тире: это может быть обычный текст.
                 If runLength >= 2 Then
                     If unsafeGroup Then unsafeGroupsFound = unsafeGroupsFound + 1
                     groupNo = groupNo + 1
@@ -146,7 +146,7 @@ Public Sub CheckAndFixWordBulletLists()
 
     FormatBulletReport ws, rowOut - 1
 
-    ' Commit the completed scan by swapping sheet names only after all rows are ready.
+    ' Заменяет предыдущий отчёт только после подготовки всех строк.
     If Not priorWs Is Nothing Then
         priorBackupName = GetUniqueBulletAuditSheetName("_bak_bullet_audit")
         priorWs.Name = priorBackupName
@@ -194,13 +194,13 @@ Public Sub CheckAndFixWordBulletLists()
         GoTo CleanExit
     End If
 
-    ' Create a same-folder backup only after the user confirms the proposed changes.
+    ' Создаёт резервную копию в той же папке только после подтверждения изменений пользователем.
     backupPath = CreateBulletBackupPath(reportPath)
     FileCopy reportPath, backupPath
     LogBulletBackup ws, backupPath
     changesStarted = True
 
-    ' Process groups from the end of the document backwards so earlier paragraph indexes remain valid.
+    ' Обрабатывает группы с конца документа, чтобы номера предыдущих абзацев не смещались.
     Dim groupStartRows() As Long, groupEndRows() As Long, groupCount As Long
     Dim rr As Long, priorGroup As Variant
     ReDim groupStartRows(1 To groupsFound)
@@ -230,7 +230,7 @@ Public Sub CheckAndFixWordBulletLists()
             offset = 0
             removeLen = 0
             If GetTypedMarker(CleanBulletParagraphText(rawText), offset, removeLen) Then
-                ' offset includes leading whitespace; preserve indentation before the marker.
+                ' Смещение включает начальные пробелы; сохраняет отступ перед маркером.
                 Dim leadingSpaces As Long, cleanText As String
                 cleanText = CleanBulletParagraphText(rawText)
                 leadingSpaces = 0
@@ -250,7 +250,7 @@ Public Sub CheckAndFixWordBulletLists()
     Next g
 
     wdDoc.Save
-    ' Update the audit sheet status; preserve the original preview text.
+    ' Обновляет состояние проверки, сохраняя исходный текст предварительного отчёта.
     ws.Range("E2:E" & rowOut - 1).Value = "Исправлено: применён маркированный список Word"
     MsgBox "Исправление завершено." & vbCrLf & _
            "Групп преобразовано: " & groupCount & vbCrLf & _
