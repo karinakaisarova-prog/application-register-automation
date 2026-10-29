@@ -1,14 +1,14 @@
 Attribute VB_Name = "modApplicationsList"
 Option Explicit
+Option Private Module
 
-' Application Register Automation
-' Main list builder for desktop Excel on Windows.
-' Requires no additional VBA references (FileSystemObject and Word are late-bound).
-'
-' Entry point: CreateMultiFolderApplicationsListCorrected
-' Folder depth: up to MAX_FOLDER_DEPTH below each selected root.
-' Manual values in column H ("Раздел") are preserved by full file path.
-' No FreezePanes are used.
+' Основной модуль формирования перечня приложений.
+' Пользовательский запуск выполняется через StartRegisterAutomation.
+' Повторное формирование — кнопкой «Повторно создать перечень» на панели.
+' Дополнительные ссылки VBA не требуются.
+' Глубина поиска — до MAX_FOLDER_DEPTH уровней вложенности.
+' Ручные значения в столбце H («Раздел») сохраняются по полному пути файла.
+' Закрепление областей не используется.
 
 Private Const HEADER_ROW As Long = 2
 Private Const FIRST_DATA_ROW As Long = 3
@@ -22,12 +22,6 @@ Private mSeenPaths As Object
 Private mLogText As String
 Private mRootPath As String
 Private mFolderErrorCount As Long
-
-' Recommended entry point for users. The existing procedure name remains available
-' for older buttons and scripts that already call it.
-Public Sub CreateApplicationsRegister()
-    CreateMultiFolderApplicationsListCorrected
-End Sub
 
 Public Sub CreateMultiFolderApplicationsListCorrected()
     Dim dlg As FileDialog
@@ -702,22 +696,6 @@ Private Sub ApplyTableFormatting(ByVal ws As Worksheet, ByVal lastRow As Long)
     ws.Columns(6).WrapText = True
     ws.Columns(7).WrapText = True
 End Sub
-
-Private Function FindWorksheetInWorkbook(ByVal wb As Workbook, ByVal sheetName As String) As Worksheet
-    Dim candidate As Worksheet
-
-    If wb Is Nothing Then
-        Err.Raise vbObjectError + 2102, "FindWorksheetInWorkbook", _
-                  "Не определена книга для создания перечня."
-    End If
-
-    For Each candidate In wb.Worksheets
-        If StrComp(candidate.Name, sheetName, vbTextCompare) = 0 Then
-            Set FindWorksheetInWorkbook = candidate
-            Exit Function
-        End If
-    Next candidate
-End Function
 
 Private Function GetOrCreateSheet(ByVal sheetName As String) As Worksheet
     Dim ws As Worksheet
