@@ -1,9 +1,9 @@
 Attribute VB_Name = "modRenameFiles"
 Option Explicit
 
-' Safe file renaming from the existing register sheet.
-' Columns: B=Object, C=Application number, D=Title, G=File hyperlink.
-' Preview + explicit confirmation; never overwrites an existing destination.
+' Безопасное переименование файлов по данным существующего перечня.
+' Столбцы: B — объект, C — номер приложения, D — наименование, G — ссылка на файл.
+' Перед переименованием показывает предварительный список и запрашивает подтверждение; существующие файлы не перезаписываются.
 
 Private Const FIRST_DATA_ROW As Long = 3
 Private Const COL_OBJECT As Long = 2
@@ -82,9 +82,9 @@ Public Sub RenameFilesFromRegister()
         newName = CleanFileName(objectName & "_Приложение № " & appNo & "_" & titleText) & ext
         newPath = Left$(oldPath, InStrRev(oldPath, Application.PathSeparator)) & newName
 
-        ' The first row with complete naming fields is the candidate for this source,
-        ' even when its name is already correct or the target is blocked. Later rows
-        ' must not rename the same physical file using a different register row.
+        ' Для каждого исходного файла используется первая строка с полными данными для имени,
+        ' даже если имя уже правильное или целевой файл занят. Следующие строки
+        ' не должны повторно переименовывать тот же файл по другим данным перечня.
         seenSource(oldPath) = r
         If StrComp(oldPath, newPath, vbTextCompare) = 0 Then
             problems = problems & "Строка " & r & ": имя файла уже соответствует полям перечня; переименование не требуется." & vbCrLf
@@ -138,7 +138,7 @@ ContinueRow:
     For Each item In plan
         DoEvents
         failure = TryRenameFile(CStr(item("OldPath")), CStr(item("NewPath")))
-        ' Track the filesystem change immediately, before any worksheet/log operations can fail.
+        ' Сразу фиксирует изменение файла, прежде чем операции с листом или журналом смогут завершиться ошибкой.
         If Len(failure) = 0 Then renamedItems.Add item
         logWs.Cells(logRow, 1).Value = Now
         logWs.Cells(logRow, 2).Value = ws.Name
@@ -147,9 +147,9 @@ ContinueRow:
         logWs.Cells(logRow, 5).Value = item("NewName")
         logWs.Cells(logRow, 6).Value = item("NewPath")
         If Len(failure) = 0 Then
-            ' A successful filesystem rename is not enough: the register must point to it.
-            ' If hyperlink replacement fails, raise into the batch handler so the file rename
-            ' is rolled back rather than leaving a stale or missing link.
+            ' Одного успешного переименования файла недостаточно: ссылка в перечне тоже должна измениться.
+            ' Если заменить ссылку не удалось, передаёт ошибку общему обработчику, чтобы отменить переименование
+            ' и не оставлять устаревшую или неработающую ссылку.
             On Error Resume Next
             Err.Clear
             ws.Cells(CLng(item("Row")), COL_LINK).Hyperlinks.Delete
@@ -190,7 +190,7 @@ Failed:
     On Error Resume Next
     Application.EnableCancelKey = xlDisabled
     If Not renamedItems Is Nothing Then
-        ' Undo in reverse order, like a transaction stack.
+        ' Отменяет изменения в обратном порядке.
         For rollbackIndex = renamedItems.Count To 1 Step -1
             Set rollbackItem = renamedItems(rollbackIndex)
             rollbackError = TryRenameFile(CStr(rollbackItem("NewPath")), CStr(rollbackItem("OldPath")))
@@ -203,7 +203,7 @@ Failed:
                     problems = problems & "Файл возвращён, но ссылка в строке " & CLng(rollbackItem("Row")) & _
                                " не восстановлена: " & rollbackError & vbCrLf
                 End If
-                ' Journal records both filesystem recovery and any hyperlink repair problem.
+                ' Журнал фиксирует и восстановление файлов, и возможные проблемы с исправлением ссылок.
                 If Not logWs Is Nothing And Len(batchId) > 0 Then
                     For r = 2 To logWs.Cells(logWs.Rows.Count, 1).End(xlUp).Row
                         If Trim$(CStr(logWs.Cells(r, 8).Value)) = batchId And _
@@ -324,7 +324,7 @@ Public Sub RollbackLastRenameBatch()
                     logWs.Cells(r, 7).Value = "Не требует отката: исходное переименование не выполнено"
                     skipped = skipped + 1
                 Else
-                    ' Filesystem already reflects a completed rollback; reconcile the journal.
+                    ' Файловая система уже отражает завершённый откат; приводит журнал в соответствие.
                     logWs.Cells(r, 7).Value = "Откатан"
                 End If
             ElseIf Len(Dir$(newPath)) = 0 Or Len(Dir$(oldPath)) > 0 Then
@@ -333,7 +333,7 @@ Public Sub RollbackLastRenameBatch()
             Else
                 errText = TryRenameFile(newPath, oldPath)
                 If Len(errText) = 0 Then
-                    ' Track immediately after the filesystem change so interruption recovery can find it.
+                    ' Фиксирует изменение сразу после операции с файлом, чтобы восстановление после прерывания могло его обнаружить.
                     Set doneItem = CreateObject("Scripting.Dictionary")
                     doneItem("LogRow") = r
                     doneItem("OldPath") = oldPath
@@ -376,10 +376,10 @@ Public Sub RollbackLastRenameBatch()
 Failed:
     failure = Err.Description
     If Err.Number = 18 Then failure = "Операция отменена пользователем (Ctrl+Break)."
-    ' Best-effort recovery: restore files already renamed back to their post-rename paths.
+    ' Пытается вернуть файлы, уже переименованные в этом запуске, к состоянию после переименования.
     On Error Resume Next
     Application.EnableCancelKey = xlDisabled
-    ' Reverse the rollback actions in reverse order to restore the pre-rollback state.
+    ' Отменяет действия отката в обратном порядке, чтобы вернуть состояние до начала отката.
     For recoveryIndex = reversedItems.Count To 1 Step -1
         Set item = reversedItems(recoveryIndex)
         recoveryError = TryRenameFile(CStr(item("OldPath")), CStr(item("NewPath")))
