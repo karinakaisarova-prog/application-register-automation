@@ -23,6 +23,12 @@ Private mLogText As String
 Private mRootPath As String
 Private mFolderErrorCount As Long
 
+' Recommended entry point for users. The existing procedure name remains available
+' for older buttons and scripts that already call it.
+Public Sub CreateApplicationsRegister()
+    CreateMultiFolderApplicationsListCorrected
+End Sub
+
 Public Sub CreateMultiFolderApplicationsListCorrected()
     Dim dlg As FileDialog
     Dim roots As Collection
