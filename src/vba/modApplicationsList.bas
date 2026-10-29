@@ -21,6 +21,7 @@ Private mSections As Object
 Private mSeenPaths As Object
 Private mLogText As String
 Private mRootPath As String
+Private mFolderErrorCount As Long
 
 Public Sub CreateMultiFolderApplicationsListCorrected()
     Dim dlg As FileDialog
@@ -58,6 +59,7 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
     Application.DisplayAlerts = False
     Application.Calculation = xlCalculationManual
     mLogText = "Формирование перечня приложений" & vbCrLf
+    mFolderErrorCount = 0
 
     Set roots = New Collection
     Set dlg = Application.FileDialog(msoFileDialogFolderPicker)
@@ -98,6 +100,18 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
         LogLine "Поиск файлов: " & mRootPath
         CollectFiles mRootPath, mRootPath, 0
     Next rootItem
+
+    If mFolderErrorCount > 0 Then
+        If MsgBox("При чтении папок возникло ошибок: " & mFolderErrorCount & "." & vbCrLf & _
+                  "Если продолжить, перечень может оказаться неполным." & vbCrLf & vbCrLf & _
+                  "Для SharePoint выбирайте папку через синхронизированную папку OneDrive в Проводнике Windows, " & _
+                  "а не веб-адрес в браузере." & vbCrLf & vbCrLf & _
+                  "Продолжить с найденными файлами?", _
+                  vbYesNo + vbExclamation + vbDefaultButton2, "Обнаружены недоступные папки") <> vbYes Then
+            LogLine "Построение остановлено: пользователь не подтвердил создание неполного перечня."
+            GoTo CleanExit
+        End If
+    End If
 
     If mFiles.Count = 0 Then
         If Not backupWs Is Nothing Then
@@ -289,7 +303,16 @@ FolderError:
         ' Do not swallow Ctrl+Break; let the top-level handler restore Excel state.
         Err.Raise 18
     End If
-    LogLine "Не удалось прочитать папку: " & currentPath & " (" & Err.Description & ")"
+    mFolderErrorCount = mFolderErrorCount + 1
+    LogLine "ОШИБКА ЧТЕНИЯ ПАПКИ: " & currentPath & " (ошибка " & Err.Number & ": " & Err.Description & ")"
+    If InStr(1, currentPath, "http://", vbTextCompare) = 1 Or _
+       InStr(1, currentPath, "https://", vbTextCompare) = 1 Then
+        LogLine "Подсказка: VBA FileSystemObject не выполняет вход в SharePoint по веб-ссылке. Используйте локальную синхронизированную папку OneDrive либо доступный Windows WebDAV-путь."
+    ElseIf Left$(currentPath, 2) = "\\" Then
+        LogLine "Подсказка: проверьте доступ к сетевой папке и права чтения."
+    Else
+        LogLine "Подсказка: проверьте, существует ли папка, синхронизирована ли она с OneDrive и доступны ли файлы локально."
+    End If
     Err.Clear
 End Sub
 
