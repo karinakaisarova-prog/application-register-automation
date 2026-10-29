@@ -83,8 +83,19 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
 
     Set mSections = CreateObject("Scripting.Dictionary")
     mSections.CompareMode = vbTextCompare
+    ' Resolve the destination workbook first, then find the sheet without
+    ' relying on a separate helper function being present in an older VBA import.
+    Dim registerWb As Workbook
+    Dim candidateWs As Worksheet
+
+    Set registerWb = GetRegisterWorkbook()
     Set ws = Nothing
-    Set ws = FindWorksheetInWorkbook(GetRegisterWorkbook(), sheetName)
+    For Each candidateWs In registerWb.Worksheets
+        If StrComp(candidateWs.Name, sheetName, vbTextCompare) = 0 Then
+            Set ws = candidateWs
+            Exit For
+        End If
+    Next candidateWs
     targetWasExisting = Not ws Is Nothing
     originalSheetName = sheetName
     If targetWasExisting Then
