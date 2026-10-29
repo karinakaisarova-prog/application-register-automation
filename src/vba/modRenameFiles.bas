@@ -184,9 +184,9 @@ ContinueRow:
 Failed:
     failure = Err.Description
     If Err.Number = 18 Then failure = "Операция отменена пользователем (Ctrl+Break)."
-    ' If a batch was interrupted, reverse every rename completed in this run.
-    ' Disable another Ctrl+Break while recovery is in progress; otherwise a second
-    ' interruption could stop the rollback halfway through.
+    ' Если пакетная операция была прервана, отменяет все переименования, выполненные в этом запуске.
+    ' На время восстановления отключает повторное прерывание, иначе второй останов
+    ' может помешать завершить откат.
     On Error Resume Next
     Application.EnableCancelKey = xlDisabled
     If Not renamedItems Is Nothing Then
@@ -289,8 +289,8 @@ Public Sub RollbackLastRenameBatch()
     End If
 
     batchId = ""
-    ' Select the newest batch based on actual file paths, not journal status alone.
-    ' This lets a partially completed rollback be retried after a previous error.
+    ' Определяет последнюю операцию по фактическим путям файлов, а не только по состоянию журнала.
+    ' Это позволяет повторить незавершённый откат после предыдущей ошибки.
     For r = lastRow To 2 Step -1
         candidateOldPath = CStr(logWs.Cells(r, 4).Value)
         candidateNewPath = CStr(logWs.Cells(r, 6).Value)
@@ -318,8 +318,8 @@ Public Sub RollbackLastRenameBatch()
             oldPath = CStr(logWs.Cells(r, 4).Value)
             newPath = CStr(logWs.Cells(r, 6).Value)
             If Len(Dir$(oldPath)) > 0 And Len(Dir$(newPath)) = 0 Then
-                ' A failed original rename can also leave oldPath present and newPath absent.
-                ' Do not label that row as rolled back when no rename ever happened.
+                ' После неудачного переименования исходный путь может сохраниться, а новый — отсутствовать.
+                ' Не отмечает строку как отменённую, если переименование фактически не выполнялось.
                 If Left$(statusText, Len("Ошибка:")) = "Ошибка:" Then
                     logWs.Cells(r, 7).Value = "Не требует отката: исходное переименование не выполнено"
                     skipped = skipped + 1
