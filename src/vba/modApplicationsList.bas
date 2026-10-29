@@ -83,9 +83,8 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
 
     Set mSections = CreateObject("Scripting.Dictionary")
     mSections.CompareMode = vbTextCompare
-    On Error Resume Next
-    Set ws = GetRegisterWorkbook().Worksheets(sheetName)
-    On Error GoTo Failed
+    Set ws = Nothing
+    Set ws = FindWorksheetInWorkbook(GetRegisterWorkbook(), sheetName)
     targetWasExisting = Not ws Is Nothing
     originalSheetName = sheetName
     If targetWasExisting Then
@@ -692,6 +691,22 @@ Private Sub ApplyTableFormatting(ByVal ws As Worksheet, ByVal lastRow As Long)
     ws.Columns(6).WrapText = True
     ws.Columns(7).WrapText = True
 End Sub
+
+Private Function FindWorksheetInWorkbook(ByVal wb As Workbook, ByVal sheetName As String) As Worksheet
+    Dim candidate As Worksheet
+
+    If wb Is Nothing Then
+        Err.Raise vbObjectError + 2102, "FindWorksheetInWorkbook", _
+                  "Не определена книга для создания перечня."
+    End If
+
+    For Each candidate In wb.Worksheets
+        If StrComp(candidate.Name, sheetName, vbTextCompare) = 0 Then
+            Set FindWorksheetInWorkbook = candidate
+            Exit Function
+        End If
+    Next candidate
+End Function
 
 Private Function GetOrCreateSheet(ByVal sheetName As String) As Worksheet
     Dim ws As Worksheet
