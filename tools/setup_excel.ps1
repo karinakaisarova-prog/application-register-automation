@@ -1,8 +1,8 @@
 ﻿$ErrorActionPreference = "Stop"
 
-# Installs project VBA modules directly into the user's already-created working copy.
+# Устанавливает модули VBA проекта непосредственно в уже созданную рабочую копию книги.
 # If the chosen file is not .xlsm, Excel converts it to .xlsm because other formats cannot store VBA.
-# Requires Windows, desktop Excel, and trusted access to the VBA project object model.
+# Требуются Windows, настольный Excel и разрешённый программный доступ к объектной модели проекта VBA.
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $vbaDir = Join-Path $repoRoot "src\vba"
 $moduleFiles = @(
@@ -48,7 +48,7 @@ $finalPath = $workbookPath
 $backupPath = $null
 $convertedOutputCreated = $false
 
-# Preserve the selected workbook before any Excel automation or format conversion.
+# Сохраняет выбранную книгу до автоматизации Excel или преобразования формата.
 try {
     $stamp = Get-Date -Format "yyyyMMdd_HHmmss"
     $backupName = [IO.Path]::GetFileNameWithoutExtension($workbookPath) + ".backup_before_macro_install_" + $stamp + [IO.Path]::GetExtension($workbookPath)
@@ -66,7 +66,7 @@ try {
     $excel.DisplayAlerts = $false
     $excel.AskToUpdateLinks = $false
 
-    # Open the already-existing working copy for editing, not read-only.
+    # Открывает существующую рабочую копию для редактирования, а не только для чтения.
     $workbook = $excel.Workbooks.Open($workbookPath, 0, $false)
 
     $dataSheet = $null
@@ -80,7 +80,7 @@ try {
         throw "В выбранной книге не найден лист с точным именем data. Закройте установщик, выберите правильную рабочую копию и повторите."
     }
 
-    # Check programmatic VBA access before changing the file format or workbook contents.
+    # Проверяет программный доступ к VBA до изменения формата файла или содержимого книги.
     try {
         $vbProject = $workbook.VBProject
         $null = $vbProject.VBComponents.Count
@@ -89,21 +89,21 @@ try {
         throw ("Excel заблокировал автоматическое добавление VBA-модулей. В Excel откройте Файл → Параметры → Центр управления безопасностью → Параметры центра управления безопасностью → Параметры макросов и включите «Доверять доступ к объектной модели проектов VBA». Затем закройте Excel и запустите установщик снова. Включайте эту настройку только если понимаете риск и доверяете исходникам проекта. Подробности: " + $_.Exception.Message)
     }
 
-    # .xlsx/.xlsb/.xls cannot store VBA projects. Convert the selected working copy
-    # to a macro-enabled workbook in the same folder; existing .xlsm is edited in place.
+    # Форматы .xlsx, .xlsb и .xls не поддерживают хранение проекта VBA. Преобразует выбранную рабочую копию
+    # в книгу с поддержкой макросов в той же папке; существующий файл .xlsm редактируется на месте.
     if (-not [string]::Equals([IO.Path]::GetExtension($workbookPath), ".xlsm", [StringComparison]::OrdinalIgnoreCase)) {
         $finalPath = [IO.Path]::ChangeExtension($workbookPath, ".xlsm")
         if (Test-Path -LiteralPath $finalPath) {
             throw ("Рядом уже существует файл .xlsm: " + $finalPath + [Environment]::NewLine + "Чтобы не перезаписать его случайно, переименуйте его или выберите рабочую книгу с другим именем.")
         }
-        # The destination did not exist above. Mark it for cleanup before SaveAs
-        # so a partial conversion is removed if SaveAs or module import fails.
+        # Целевого файла ранее не существовало. Помечает его для удаления перед SaveAs
+        # чтобы удалить неполный результат, если SaveAs или импорт модуля завершится ошибкой.
         $convertedOutputCreated = $true
         $workbook.SaveAs($finalPath, 52)
         Write-Host ("Рабочая книга преобразована в формат .xlsm: " + $finalPath)
     }
 
-    # Replace same-named project modules so repeated installation does not create duplicates.
+    # Заменяет одноимённые модули проекта, чтобы повторная установка не создавала дубликаты.
     foreach ($name in $moduleFiles) {
         $moduleName = [IO.Path]::GetFileNameWithoutExtension($name)
         for ($i = $vbProject.VBComponents.Count; $i -ge 1; $i--) {
@@ -128,8 +128,8 @@ finally {
         try { $excel.Quit() } catch {}
     }
     if (-not $success -and $convertedOutputCreated -and $finalPath -ne $workbookPath) {
-        # Remove only the new .xlsm destination, never the selected original file.
-        # The original workbook and its pre-install backup are retained.
+        # Удаляет только новый файл .xlsm, но никогда не удаляет выбранный исходный файл.
+        # Исходная книга и её резервная копия, созданная до установки, сохраняются.
         try {
             if (Test-Path -LiteralPath $finalPath -PathType Leaf) {
                 Remove-Item -LiteralPath $finalPath -Force -ErrorAction Stop
