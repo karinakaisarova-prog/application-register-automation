@@ -51,8 +51,8 @@ for path in modules:
     for kind, name, number in stack:
         errors.append(f'{path.relative_to(root)}:{number}: missing End {kind} for {name}')
 
-    # Check GoTo targets within each procedure. This catches misspelled labels
-    # that a simple count of Sub/Function endings cannot detect.
+    # Проверяет переходы GoTo внутри каждой процедуры. Это позволяет находить ошибочные метки
+    # которые невозможно обнаружить простым подсчётом завершений Sub и Function.
     procedure_start = None
     procedure_lines = []
     procedure_name = ''
@@ -104,7 +104,7 @@ for name, entries in seen.items():
             ', '.join(f'{p.relative_to(root)}:{n}' for p, n, _ in entries)
         )
 
-# Every macro wired to a visible panel button must resolve to a Public Sub.
+# Для каждой команды видимой кнопки панели должна существовать процедура Public Sub.
 public_procedures = set()
 for path in modules:
     source = path.read_text(encoding='utf-8-sig')
@@ -124,8 +124,8 @@ if panel_module.exists():
             if macro_name.lower() not in public_procedures:
                 errors.append('modRegisterPanel.bas: button target is not a Public Sub: ' + macro_name)
 
-# Object detection is limited to the selected folder tree, then the filename.
-# A matching parent folder outside the selected root must not override the object.
+# Объект определяется по выбранной папке и её вложенным папкам, затем по имени файла.
+# Совпадение в родительской папке за пределами выбранной папки не должно менять объект.
 list_module = root / 'src' / 'vba' / 'modApplicationsList.bas'
 if list_module.exists():
     source = list_module.read_text(encoding='utf-8-sig')
@@ -150,15 +150,15 @@ if list_module.exists():
         if not boundary_match or 'Ёё' not in boundary_match.group(1):
             errors.append('modApplicationsList.bas: object-name boundaries must treat Ё/ё as Cyrillic letters')
 
-# Keep folder scans responsive so Ctrl+Break can be handled during large directories.
+# Проверка папок должна позволять своевременно обработать Ctrl+Break даже в больших каталогах.
 if list_module.exists():
     scan_source = list_module.read_text(encoding='utf-8-sig')
     file_loop = re.search(r'For Each fileItem In folder\.Files(.*?)Next fileItem', scan_source, re.I | re.S)
     if not file_loop or 'DoEvents' not in file_loop.group(1) or 'Application.StatusBar' not in file_loop.group(1):
         errors.append('modApplicationsList.bas: file scan must yield to Excel and update progress inside the file loop')
 
-# Guard SharePoint path normalization: keep ordinary Windows paths unchanged,
-# convert HTTP(S) roots to WebDAV UNC, and use VBA's single-backslash separator.
+# Проверяет преобразование путей SharePoint: обычные пути Windows должны оставаться без изменений,
+# веб-адреса HTTP(S) преобразуются в сетевые пути WebDAV с разделителями VBA.
 if list_module.exists():
     sharepoint_source = list_module.read_text(encoding='utf-8-sig')
     sharepoint_guards = (
@@ -173,14 +173,14 @@ if list_module.exists():
         if fragment not in sharepoint_source:
             errors.append('modApplicationsList.bas: SharePoint path handling missing or malformed: ' + fragment)
 
-# File renaming must treat a broken register hyperlink update as a batch failure.
+# Если после переименования не удалось обновить ссылку в перечне, пакетная операция должна считаться неудачной.
 rename_module = root / "src" / "vba" / "modRenameFiles.bas"
 if rename_module.exists():
     rename_source = rename_module.read_text(encoding="utf-8-sig")
     if "Не удалось обновить гиперссылку в строке" not in rename_source or "Err.Raise vbObjectError + 2401" not in rename_source:
         errors.append("modRenameFiles.bas: hyperlink-update failure must trigger rollback")
 
-# Rollback must report a failed hyperlink repair even when the filesystem rename itself succeeded.
+# Откат должен сообщать об ошибке исправления ссылки, даже если файл был успешно переименован.
 if rename_module.exists():
     recovery_source = rename_module.read_text(encoding='utf-8-sig')
     for fragment in (
@@ -191,7 +191,7 @@ if rename_module.exists():
         if fragment not in recovery_source:
             errors.append('modRenameFiles.bas: rollback hyperlink-repair reporting missing: ' + fragment)
 
-# Duplicate application numbers are compared after normalizing leading zeros, while retaining suffixes.
+# Повторяющиеся номера приложений сравниваются без начальных нулей, но с сохранением буквенных суффиксов.
 if list_module.exists():
     duplicate_source = list_module.read_text(encoding='utf-8-sig')
     duplicate_fragments = (
@@ -203,7 +203,7 @@ if list_module.exists():
         if fragment not in duplicate_source:
             errors.append(f'modApplicationsList.bas: duplicate-number normalization missing: {fragment}')
 
-# Guard filename parsing against common grammatical forms of "Приложение".
+# Проверяет разбор имён файлов с распространёнными грамматическими формами слова «Приложение».
 if list_module.exists():
     parser_source = list_module.read_text(encoding='utf-8-sig')
     parser_forms = (
@@ -214,14 +214,14 @@ if list_module.exists():
         if fragment not in parser_source:
             errors.append(f'modApplicationsList.bas: filename parser missing expected form/index: {fragment}')
 
-# Duplicate highlighting must use the same normalized key as the counting pass;
-# otherwise values such as 01 and 1 are counted together but not all highlighted.
+# Подсветка повторов должна использовать тот же нормализованный ключ, что и подсчёт;
+# иначе значения 01 и 1 будут посчитаны как одинаковые, но не все строки будут выделены.
 if list_module.exists():
     duplicate_key = 'key = UCase$(objectName) & "|" & NormalizeApplicationNumberForDuplicateCheck(appNumber)'
     if list_module.read_text(encoding='utf-8-sig').count(duplicate_key) < 2:
         errors.append('modApplicationsList.bas: duplicate counting and highlighting must use the same normalized key')
 
-# Special department marker applies only to the two explicitly named base filenames.
+# Специальная отметка отдела применяется только к двум указанным базовым именам файлов.
 if list_module.exists():
     special_source = list_module.read_text(encoding='utf-8-sig')
     special_match = re.search(
@@ -253,8 +253,8 @@ if readme.exists():
         if phrase in readme_text:
             errors.append(f'README.md: outdated object-detection rule remains: {phrase}')
 
-# Keep all user-facing documentation and manual test cases aligned with the
-# selected-root boundary; otherwise an obsolete test can reintroduce the old rule.
+# Согласует пользовательскую документацию и ручные проверки с правилом
+# границ выбранной папки, чтобы устаревшая проверка не вернула прежнее поведение.
 for doc_path in (root / 'docs' / 'requirements.md', root / 'tests' / 'test-checklist.md'):
     if doc_path.exists():
         doc_text = doc_path.read_text(encoding='utf-8-sig').lower()
@@ -267,8 +267,8 @@ for doc_path in (root / 'docs' / 'requirements.md', root / 'tests' / 'test-check
             if phrase in doc_text:
                 errors.append(f'{doc_path.relative_to(root)}: outdated object-detection rule remains: {phrase}')
 
-# Guard mention-scanning behavior that is easy to regress:
-# common grammatical forms must be recognized and each match must use its own start page.
+# Проверяет поведение поиска упоминаний, которое легко случайно нарушить:
+# должны распознаваться распространённые формы слова, а страница — определяться отдельно для каждого совпадения.
 analysis_module = root / 'src' / 'vba' / 'modReportAnalysis.bas'
 if analysis_module.exists():
     analysis_source = analysis_module.read_text(encoding='utf-8-sig')
@@ -286,7 +286,7 @@ if analysis_module.exists():
         if fragment not in analysis_source:
             errors.append(f'modReportAnalysis.bas: required mention-scanning logic missing: {fragment}')
 
-# Page-count helper must propagate Ctrl+Break instead of swallowing it under local Resume Next.
+# Подсчёт страниц должен передавать Ctrl+Break обработчику, а не подавлять его локальным Resume Next.
 if analysis_module.exists():
     workbook_pages_match = re.search(
         r'Private Function CountWorkbookPrintPages\b(.*?)^End Function\s*$',
@@ -319,14 +319,14 @@ if rename_module.exists():
         if fragment not in rename_source:
             errors.append(f'modRenameFiles.bas: reverse-order recovery logic missing: {fragment}')
 
-    # A row whose original rename failed must not be falsely marked as rolled back
-    # just because the old path exists and the destination path does not.
+    # Строка с неудачным исходным переименованием не должна ошибочно отмечаться как отменённая
+    # только потому, что исходный путь существует, а целевой отсутствует.
     if 'If Left$(statusText, Len("Ошибка:")) = "Ошибка:" Then' not in rename_source or \
        'Не требует отката: исходное переименование не выполнено' not in rename_source:
         errors.append('modRenameFiles.bas: rollback must preserve the distinction between failed renames and actual rollbacks')
 
-    # A no-op first candidate must still reserve its source path, otherwise a
-    # duplicate register row can rename the same physical file a second time.
+    # Даже если первый подходящий файл не пришлось переименовывать, его путь должен считаться занятым, иначе
+    # дублирующая строка перечня может повторно переименовать тот же файл.
     source_claim = rename_source.find('seenSource(oldPath) = r')
     no_op_check = rename_source.find('If StrComp(oldPath, newPath, vbTextCompare) = 0 Then')
     if source_claim < 0 or no_op_check < 0 or source_claim > no_op_check:
@@ -334,8 +334,8 @@ if rename_module.exists():
     if 'имя файла уже соответствует полям перечня; переименование не требуется.' not in rename_source:
         errors.append('modRenameFiles.bas: no-op rename candidate should be reported as a skipped row')
 
-# Guard table-caption recognition: a SEQ field must be in the nearest non-empty
-# paragraph and the visible paragraph must start with the expected caption label.
+# Проверяет распознавание подписи таблицы: поле SEQ должно находиться в ближайшем непустом
+# абзаце, а видимая подпись должна начинаться с ожидаемого слова.
 table_module = root / 'src' / 'vba' / 'modTableNumbering.bas'
 if table_module.exists():
     table_source = table_module.read_text(encoding='utf-8-sig')
@@ -356,7 +356,7 @@ if table_module.exists():
             if fragment not in caption_code:
                 errors.append('modTableNumbering.bas: caption recognition guard missing: ' + fragment)
 
-# The final Word table audit must be populated on a staging sheet before replacing the preview.
+# Итоговый отчёт проверки таблиц Word должен быть полностью сформирован на временном листе до замены предварительного отчёта.
 if table_module.exists():
     final_report_guards = (
         'Set finalWs = GetRegisterWorkbook().Worksheets.Add',
@@ -372,7 +372,7 @@ if table_module.exists():
         if fragment not in table_source:
             errors.append('modTableNumbering.bas: staged final-report replacement guard missing: ' + fragment)
 
-# Guard against creating duplicate captions when a visible manual caption already exists.
+# Проверяет, что автоматическая подпись не дублируется, если рядом уже есть обычная подпись.
 if table_module.exists():
     for fragment in (
         'Private Function IsTableCaptionText(',
@@ -383,10 +383,10 @@ if table_module.exists():
         if fragment not in table_source:
             errors.append('modTableNumbering.bas: manual-caption protection missing: ' + fragment)
 
-# Guard the current single-workbook startup design. The startup macro must
-# validate the exact data sheet, assign the selected workbook context, and
-# report a handled error without silently swallowing it. Do not assert resultWb
-# cleanup: this version intentionally does not create a separate result workbook.
+# Проверяет текущую схему работы в одной книге. Макрос запуска должен
+# проверить наличие нужного листа data, назначить рабочую книгу и
+# сообщить об обработанной ошибке, а не скрывать её. Не проверяет очистку resultWb,
+# поскольку эта версия намеренно не создаёт отдельную книгу результата.
 context_module = root / 'src' / 'vba' / 'modWorkbookContext.bas'
 if context_module.exists():
     context_source = context_module.read_text(encoding='utf-8-sig')
@@ -402,8 +402,8 @@ if context_module.exists():
         if fragment not in context_source:
             errors.append(f'modWorkbookContext.bas: single-workbook startup guard missing: {fragment}')
 
-# Required launch points must be externally callable macros, not merely private
-# procedures or functions with the same names.
+# Точки запуска должны быть доступными извне макросами, а не только закрытыми
+# процедурами или функциями с такими же именами.
 required_public_subs = {
     name.lower()
     for name in re.findall(
@@ -421,9 +421,9 @@ if missing:
     errors.append('Missing required entry points: ' + ', '.join(missing))
 
 
-# Guard the installer contract: every VBA source module must be listed exactly
-# once in the installer, and the CMD launcher must stay ASCII-only because
-# Windows CMD can misread UTF-8 Cyrillic text depending on the active code page.
+# Проверяет установщик: каждый исходный модуль VBA должен быть указан ровно
+# один раз, а файл запуска CMD должен содержать только ASCII-символы, поскольку
+# Windows CMD может неверно читать кириллицу UTF-8 в зависимости от активной кодировки.
 installer_path = root / 'tools' / 'setup_excel.ps1'
 launcher_path = root / 'tools' / 'Установить_книгу_Excel.cmd'
 if installer_path.exists():
@@ -440,7 +440,7 @@ if launcher_path.exists():
     if any(byte > 127 for byte in launcher_bytes):
         errors.append('Установить_книгу_Excel.cmd: launcher must remain ASCII-only')
 
-# Keep installer recovery behavior covered by static regression checks.
+# Проверяет средствами статического анализа сценарии восстановления установщика.
 if installer_path.exists():
     for fragment in (
         '$backupPath = Join-Path',
@@ -453,8 +453,8 @@ if installer_path.exists():
 
 
 
-# Mixed leading indentation can indicate nested list levels. The bullet fixer
-# must stop before editing such a document instead of flattening those levels.
+# Различные отступы могут указывать на вложенные уровни списка. Макрос исправления списков
+# должен остановиться до изменений, чтобы не превратить вложенный список в одноуровневый.
 bullet_module = root / 'src' / 'vba' / 'modBulletListAudit.bas'
 if bullet_module.exists():
     bullet_source = bullet_module.read_text(encoding='utf-8-sig')
@@ -471,8 +471,8 @@ if bullet_module.exists():
             errors.append('modBulletListAudit.bas: nested-list safety guard missing: ' + fragment)
 
 
-# Guard Word-document edits: a same-folder backup must be made before changes,
-# and a failed/cancelled edit must attempt restoration after closing Word.
+# Проверяет изменение документов Word: до начала правок должна создаваться резервная копия в той же папке,
+# а после ошибки или отмены программа должна попытаться восстановить файл после закрытия Word.
 for module_name, function_prefix, log_prefix in (
     ('modTableNumbering.bas', 'CreateWordBackupPath', 'LogTableBackup'),
     ('modBulletListAudit.bas', 'CreateBulletBackupPath', 'LogBulletBackup'),
@@ -498,7 +498,7 @@ for module_name, function_prefix, log_prefix in (
         change_pos = module_source.find('changesStarted = True', backup_pos)
         first_edit_pos = module_source.find('EnsureTableCaptionLabel wdDoc') if module_name == 'modTableNumbering.bas' else module_source.find('wordRange.Delete')
         if backup_pos < 0 or change_pos < backup_pos or first_edit_pos < 0 or backup_pos > first_edit_pos:
-            # Bullet list edit is inside a later loop; backup must precede its first deletion.
+            # Изменение маркированного списка выполняется в следующем цикле; резервная копия должна быть создана до первого удаления.
             errors.append(f'{module_name}: backup must be created before document edits')
 
 print(f'Modules scanned: {len(modules)}; procedures/functions: {sum(len(x) for x in seen.values())}')
