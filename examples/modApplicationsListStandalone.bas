@@ -1,14 +1,14 @@
 Attribute VB_Name = "modApplicationsListStandalone"
 Option Explicit
 
-' Application Register Automation
-' Main list builder for desktop Excel on Windows.
-' Standalone version: only the application-register builder; no installer or other VBA modules required.
+' Автоматизация перечня приложений
+' Основной макрос формирования перечня в настольном Excel под Windows.
+' Отдельная версия: только макрос формирования перечня; установщик и другие модули VBA не требуются.
 '
-' Entry point: CreateMultiFolderApplicationsListCorrected
-' Folder depth: up to MAX_FOLDER_DEPTH below each selected root.
-' Manual values in column H ("Раздел") are preserved by full file path.
-' No FreezePanes are used.
+' Основная процедура формирования перечня: CreateMultiFolderApplicationsListCorrected
+' Глубина поиска: до MAX_FOLDER_DEPTH уровней внутри каждой выбранной папки.
+' Ручные значения столбца H («Раздел») сохраняются по полному пути к файлу.
+' Закрепление областей не используется.
 
 Private Const HEADER_ROW As Long = 2
 Private Const FIRST_DATA_ROW As Long = 3
@@ -83,7 +83,7 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
     originalSheetName = sheetName
     If targetWasExisting Then
         SaveExistingSections ws, mSections
-        ' Keep a worksheet-level recovery copy before any destructive rebuild.
+        ' Перед перестроением создаёт резервную копию листа для восстановления.
         backupSheetName = GetUniqueBackupSheetName()
         ws.Copy After:=ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count)
         Set backupWs = ThisWorkbook.Worksheets(ThisWorkbook.Worksheets.Count)
@@ -141,14 +141,14 @@ Failed:
     If Not backupWs Is Nothing Then
         Application.DisplayAlerts = False
         If Not rebuildStarted Then
-            ' The original sheet has not been changed; discard only the unused copy.
+            ' Исходный лист не менялся; удаляет только ненужную копию.
             backupWs.Delete
             Set backupWs = Nothing
             LogLine "Формирование не началось; исходный лист оставлен без изменений."
         Else
-            ' Never delete the damaged worksheet before the backup has taken
-            ' the original name successfully. If a rename fails, retain the
-            ' backup and leave the remaining worksheet(s) available for recovery.
+            ' Не удаляет повреждённый лист, пока резервная копия не получит его исходное имя.
+            ' Если переименование не удалось, сохраняет резервную копию
+            ' и оставляет доступные листы для восстановления.
             Set damagedWs = Nothing
             Set damagedWs = ThisWorkbook.Worksheets(originalSheetName)
             If damagedWs Is Nothing Then
@@ -209,8 +209,8 @@ Failed:
 CleanExit:
     On Error Resume Next
     If Not backupWs Is Nothing Then
-        ' A remaining backup may be the only recoverable copy after a failed restore.
-        ' Keep it rather than infer success from Err.Number, which may have been cleared.
+        ' После неудачного восстановления резервная копия может остаться единственной доступной копией.
+        ' Сохраняет её, не полагаясь на Err.Number, который мог быть сброшен.
         LogLine "Резервная копия сохранена для проверки: " & backupWs.Name
     End If
     Application.ScreenUpdating = oldScreenUpdating
@@ -295,7 +295,7 @@ Private Sub CollectFiles(ByVal rootPath As String, ByVal currentPath As String, 
 
 FolderError:
     If Err.Number = 18 Then
-        ' Do not swallow Ctrl+Break; let the top-level handler restore Excel state.
+        ' Не подавляет Ctrl+Break: основной обработчик должен восстановить настройки Excel.
         Err.Raise 18
     End If
     LogLine "Не удалось прочитать папку: " & currentPath & " (" & Err.Description & ")"
@@ -368,8 +368,8 @@ Private Function GetObjectName(ByVal currentPath As String, ByVal fileName As St
     Dim candidate As String
     Dim objectNames As Variant
 
-    ' Only inspect folders inside the selected root, including the root itself.
-    ' A parent folder outside the selected root must not determine the object.
+    ' Проверяет только выбранную папку и вложенные в неё папки.
+    ' Родительская папка за пределами выбранной не должна определять объект.
     objectNames = Array("КЗТ", "СМТ", "АМТ", "Саратов", "НТУ", "КТ")
     Set fso = CreateObject("Scripting.FileSystemObject")
     folderPath = RemoveTrailingSlash(currentPath)
@@ -383,15 +383,15 @@ Private Function GetObjectName(ByVal currentPath As String, ByVal fileName As St
             Exit Function
         End If
 
-        ' Stop after checking the selected root; never inspect its parent.
+        ' После проверки выбранной папки не проверяет родительские папки.
         If StrComp(folderPath, selectedRootPath, vbTextCompare) = 0 Then Exit Do
         parentPath = fso.GetParentFolderName(folderPath)
         If Len(parentPath) = 0 Or StrComp(parentPath, folderPath, vbTextCompare) = 0 Then Exit Do
         folderPath = RemoveTrailingSlash(parentPath)
     Loop
 
-    ' If no approved object was found in the selected folder chain, inspect
-    ' the filename. Return blank rather than guessing an unapproved object.
+    ' Если в пути выбранной папки не найден подходящий объект, проверяет имя файла.
+    ' Если объект определить нельзя, оставляет значение пустым, а не угадывает.
     GetObjectName = FindObjectInText(fileName, objectNames)
 End Function
 
@@ -406,7 +406,7 @@ Private Function FindObjectInText(ByVal sourceText As String, ByVal objectNames 
 
     For i = LBound(objectNames) To UBound(objectNames)
         objectName = CStr(objectNames(i))
-        ' Match a complete code/name, not a substring inside another word.
+        ' Ищет полное обозначение или название, а не часть другого слова.
         rx.Pattern = "(^|[^А-Яа-яЁёA-Za-z0-9])" & objectName & "([^А-Яа-яЁёA-Za-z0-9]|$)"
         If rx.Test(sourceText) Then
             FindObjectInText = objectName
@@ -542,7 +542,7 @@ Private Sub CheckDuplicateApplicationNumbers(ByVal ws As Worksheet)
     Set counts = CreateObject("Scripting.Dictionary")
     counts.CompareMode = vbTextCompare
 
-    ' Count each application number separately within each object.
+    ' Считает номера приложений отдельно для каждого объекта.
     For r = FIRST_DATA_ROW To lastRow
         objectName = Trim$(CStr(ws.Cells(r, 2).Value))
         appNumber = Trim$(CStr(ws.Cells(r, 3).Value))
@@ -556,7 +556,7 @@ Private Sub CheckDuplicateApplicationNumbers(ByVal ws As Worksheet)
         End If
     Next r
 
-    ' Highlight every row participating in a duplicate, and record it in the run log.
+    ' Выделяет все строки с повторяющимися номерами и записывает их в журнал запуска.
     For r = FIRST_DATA_ROW To lastRow
         objectName = Trim$(CStr(ws.Cells(r, 2).Value))
         appNumber = Trim$(CStr(ws.Cells(r, 3).Value))
@@ -587,8 +587,8 @@ Private Function NormalizeApplicationNumberForDuplicateCheck(ByVal appNumber As 
     Dim value As String
     value = UCase$(Trim$(appNumber))
 
-    ' Leading zeros do not make a different application number (01 = 1, 001A = 1A).
-    ' Preserve a trailing letter suffix because 1A and 1B are distinct numbers.
+    ' Начальные нули не создают новый номер: 01 считается номером 1, а 001A — номером 1A.
+    ' Сохраняет буквенный суффикс, поскольку 1A и 1B — разные номера.
     Do While Len(value) > 1 And Left$(value, 1) = "0" And _
              Mid$(value, 2, 1) >= "0" And Mid$(value, 2, 1) <= "9"
         value = Mid$(value, 2)
@@ -610,8 +610,8 @@ Private Sub ApplyLookups(ByVal ws As Worksheet)
     lastRow = ws.Cells(ws.Rows.Count, 4).End(xlUp).Row
     For r = FIRST_DATA_ROW To lastRow
         appName = Trim$(CStr(ws.Cells(r, 4).Value))
-        ' The exact source filename was checked while building the row. Preserve
-        ' its special dash here; do not infer special status from a generic title.
+        ' Точное имя исходного файла проверено при формировании строки. Сохраняет
+        ' специальное тире и не определяет его только по общему названию.
         If Trim$(CStr(ws.Cells(r, 5).Value)) <> "—" Then
             ws.Cells(r, 5).FormulaLocal = "=ЕСЛИОШИБКА(ИНДЕКС(data!$B:$B;ПОИСКПОЗ($D" & r & ";data!$A:$A;0));"""")"
         End If
@@ -627,7 +627,7 @@ Private Function IsSpecialDepartmentFile(ByVal fileNameOrNumber As String, ByVal
     baseName = fso.GetBaseName(fileNameOrNumber)
     normalizedFile = LCase$(Trim$(Replace(baseName, "ё", "е")))
 
-    ' Match only exact base filenames, never a generic parsed title.
+    ' Сопоставляет только точные базовые имена файлов, а не общее разобранное название.
     IsSpecialDepartmentFile = (normalizedFile = "отчет_2 кв 2026" Or _
                                normalizedFile = "реестр рисков")
 End Function
@@ -715,9 +715,9 @@ Private Function SafeSheetName(ByVal value As String) As String
     SafeSheetName = value
 End Function
 
-' FolderPicker can return an HTTP(S) SharePoint URL instead of a Windows path.
-' Convert it to the Windows WebDAV UNC form before calling FileSystemObject.
-' For example:
+' Окно выбора папки может вернуть веб-адрес SharePoint вместо пути Windows.
+' Перед обращением к файловой системе преобразует адрес в сетевой путь WebDAV Windows.
+' Например:
 ' http://server:55555/SD/Folder -> \\server@55555\DavWWWRoot\SD\Folder
 Private Function NormalizeSelectedRootPath(ByVal selectedPath As String) As String
     Dim schemeEnd As Long
@@ -753,7 +753,7 @@ Private Function NormalizeSelectedRootPath(ByVal selectedPath As String) As Stri
         urlPath = Mid$(selectedPath, slashAfterHost + 1)
     End If
 
-    ' Remove query strings or fragments if the picker supplied them.
+    ' Удаляет параметры запроса и фрагмент адреса, если они присутствуют.
     If InStr(urlPath, "?") > 0 Then urlPath = Left$(urlPath, InStr(urlPath, "?") - 1)
     If InStr(urlPath, "#") > 0 Then urlPath = Left$(urlPath, InStr(urlPath, "#") - 1)
     urlPath = Replace(urlPath, "%20", " ")
@@ -797,8 +797,8 @@ Private Function GetFolderName(ByVal folderPath As String) As String
     If Not fso Is Nothing Then GetFolderName = fso.GetFolder(normalizedPath).Name
     On Error GoTo 0
 
-    ' A WebDAV location may be inaccessible when the sheet name is derived.
-    ' Fall back to the final path segment so the later scan can log the real access error.
+    ' Сетевой путь WebDAV может быть недоступен уже при определении имени листа.
+    ' Использует последний фрагмент пути, чтобы последующая проверка записала реальную ошибку доступа.
     If Len(GetFolderName) = 0 Then
         normalizedPath = Replace(normalizedPath, "/", "\")
         separatorPos = InStrRev(normalizedPath, "\")
