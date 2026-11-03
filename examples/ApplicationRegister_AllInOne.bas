@@ -1,7 +1,7 @@
 Attribute VB_Name = "ApplicationRegister_AllInOne"
 Option Explicit
 
-' ===== Source module: modWorkbookContext.bas =====
+' ===== Исходный модуль: modWorkbookContext.bas =====
 ' Книга с макросами, справочником data и перечнем — одна и та же книга.
 ' Запускатель работает в ThisWorkbook и не создаёт отдельную книгу результата.
 Public gRegisterWorkbook As Workbook
@@ -116,7 +116,7 @@ Public Function GetActiveRegisterSheet() As Worksheet
 End Function
 
 
-' ===== Source module: modRegisterPanel.bas =====
+' ===== Исходный модуль: modRegisterPanel.bas =====
 ' Панель управления макросами на листе перечня.
 ' Кнопки размещаются справа от таблицы, начиная с колонки L,
 ' чтобы не сдвигать строки перечня и не менять формулы.
@@ -227,7 +227,7 @@ OpenError:
 End Sub
 
 
-' ===== Source module: modApplicationsList.bas =====
+' ===== Исходный модуль: modApplicationsList.bas =====
 ' Автоматизация перечня приложений
 ' Основной макрос формирования перечня в настольном Excel под Windows.
 ' Дополнительные ссылки VBA не требуются; объекты файловой системы и Word создаются без предварительного подключения библиотек.
@@ -944,7 +944,7 @@ Private Sub LogLine(ByVal message As String)
 End Sub
 
 
-' ===== Source module: modReportAnalysis.bas =====
+' ===== Исходный модуль: modReportAnalysis.bas =====
 ' Анализирует отчёт Word; для выполнения требуется Microsoft Word.
 ' Результаты записываются на лист «Упоминания отчёта».
 ' Исходный отчёт не изменяется.
@@ -1057,8 +1057,8 @@ Public Sub ScanWordReportMentions()
             On Error GoTo Failed
 
             For Each mt In matches
-                ' Resolve the page from the exact match range, not the paragraph
-                ' end: one long paragraph can contain mentions on different pages.
+                ' Определяет страницу по точному диапазону совпадения, а не по концу абзаца:
+                ' в одном длинном абзаце могут быть упоминания на разных страницах.
                 Set rng = wdDoc.Range(para.Range.Start + CLng(mt.FirstIndex), _
                                       para.Range.Start + CLng(mt.FirstIndex) + CLng(mt.Length))
                 pageNo = CLng(rng.Information(1)) ' wdActiveEndAdjustedPageNumber: page number as displayed in Word
@@ -1251,8 +1251,8 @@ Public Sub CountPagesForRegister()
             ws.Cells(r, 10).Value = "Файл не найден"
             failed = failed + 1
         Else
-            ' Do not leave a stale page count from an earlier run when the
-            ' register row has no usable hyperlink/path.
+            ' Не оставляет количество страниц от предыдущего запуска, если
+            ' в строке перечня нет действующей ссылки или пути к файлу.
             ws.Cells(r, 10).Value = "Нет ссылки на файл"
             failed = failed + 1
         End If
@@ -1452,7 +1452,7 @@ Private Sub FormatReportResults(ByVal ws As Worksheet, ByVal lastRow As Long)
 End Sub
 
 
-' ===== Source module: modTableNumbering.bas =====
+' ===== Исходный модуль: modTableNumbering.bas =====
 ' Проверяет все таблицы документа Word.
 ' Перед изменением документа формирует предварительный отчёт на листе Excel.
 ' Для таблиц без подписи добавляет автоматические поля SEQ и обновляет поля документа.
@@ -1529,8 +1529,8 @@ Public Sub CheckAndNumberWordTables()
     wdApp.Visible = False
     Set wdDoc = wdApp.Documents.Open(reportPath, False, False, False)
 
-    ' Build the new report on a temporary sheet. Keep the previous report intact
-    ' until the scan has completed successfully.
+    ' Формирует новый отчёт на временном листе и сохраняет предыдущий отчёт
+    ' до успешного завершения проверки.
     On Error Resume Next
     Set priorWs = GetRegisterWorkbook().Worksheets(TableNumbering_TABLE_REPORT_SHEET)
     On Error GoTo Failed
@@ -1653,8 +1653,8 @@ Public Sub CheckAndNumberWordTables()
     UpdateAllStoryFields wdDoc
     wdDoc.Save
 
-    ' Build the final-state report on a separate temporary sheet. The current
-    ' preview remains intact until the refreshed report is completely populated.
+    ' Формирует окончательный отчёт на отдельном временном листе. Текущий
+    ' предварительный отчёт сохраняется, пока новый не будет полностью заполнен.
     finalStageName = GetUniqueTableAuditSheetName("_tmp_table_final")
     Set finalWs = GetRegisterWorkbook().Worksheets.Add(After:=GetRegisterWorkbook().Worksheets(GetRegisterWorkbook().Worksheets.Count))
     finalWs.Name = finalStageName
@@ -1687,8 +1687,8 @@ Public Sub CheckAndNumberWordTables()
     Next tbl
     FormatTableReport finalWs, r - 1
 
-    ' Swap only after the final report is complete; keep the old preview as a
-    ' rollback point until the new sheet has the canonical name.
+    ' Заменяет листы только после подготовки окончательного отчёта; сохраняет старый
+    ' отчёт как резервную копию, пока новый лист не получит основное имя.
     finalOldName = GetUniqueTableAuditSheetName("_bak_table_final")
     ws.Name = finalOldName
     finalOldRenamed = True
@@ -1698,9 +1698,9 @@ Public Sub CheckAndNumberWordTables()
     Set ws = finalWs
     Set finalWs = Nothing
     Application.DisplayAlerts = False
-    ' Deleting the old preview is cleanup, not part of the Word edit transaction.
-    ' If Excel refuses to delete it, keep the backup sheet rather than restoring
-    ' the Word file after the final report has already been committed.
+    ' Удаление старого предварительного отчёта — завершающая очистка, а не часть изменения документа Word.
+    ' Если Excel не позволяет удалить лист, сохраняет резервную копию и не восстанавливает
+    ' исходный документ после сохранения итогового отчёта.
     On Error Resume Next
     GetRegisterWorkbook().Worksheets(finalOldName).Delete
     If Err.Number = 0 Then
@@ -1813,8 +1813,8 @@ Private Sub InsertCustomTableCaption(ByVal wdApp As Object, ByVal wdDoc As Objec
     Dim captionEnd As Long
     Dim foundSeq As Boolean
 
-    ' Let Word create a real caption paragraph above the table, then change its
-    ' SEQ field format so the field itself displays "Таблица № 1", etc.
+    ' Просит Word создать настоящий абзац подписи над таблицей, затем меняет формат поля
+    ' SEQ, чтобы оно отображало «Таблица № 1» и последующие номера.
     tbl.Range.Select
     wdApp.Selection.InsertCaption "Таблица", "", , TableNumbering_WD_CAPTION_POSITION_ABOVE, ""
 
@@ -1828,8 +1828,8 @@ Private Sub InsertCustomTableCaption(ByVal wdApp As Object, ByVal wdDoc As Objec
     For Each fld In captionPara.Fields
         If InStr(1, CStr(fld.Code.Text), "SEQ", vbTextCompare) > 0 And _
            InStr(1, CStr(fld.Code.Text), "ТАБЛИЦА", vbTextCompare) > 0 Then
-            ' Remove Word's literal label before the field; the field format
-            ' supplies the complete visible caption.
+            ' Удаляет обычный текст подписи перед полем: формат поля
+            ' задаёт полный вид подписи.
             If fld.Range.Start > captionPara.Start Then
                 Set prefixRange = wdDoc.Range(captionPara.Start, fld.Range.Start)
                 prefixRange.Text = ""
@@ -1907,9 +1907,9 @@ Private Function HasTableSequenceField(ByVal wdDoc As Object, ByVal tableStart A
     Dim paraText As String
     Dim trimmedText As String
 
-    ' Skip a few empty paragraphs, then inspect only the nearest non-empty
-    ' paragraph. A SEQ field alone is not enough: it must be in a caption-like
-    ' paragraph beginning with the visible label "Таблица".
+    ' Пропускает пустые абзацы и проверяет ближайший непустой
+    ' абзац. Наличия поля SEQ недостаточно: оно должно находиться в подписи,
+    ' начинающейся с видимого слова «Таблица».
     For paraIndex = wdDoc.Paragraphs.Count To 1 Step -1
         Set para = wdDoc.Paragraphs(paraIndex).Range
         If para.Start >= tableStart Or para.Information(TableNumbering_WD_WITHIN_TABLE) Then
@@ -2043,7 +2043,7 @@ Private Sub FormatTableReport(ByVal ws As Worksheet, ByVal lastRow As Long)
 End Sub
 
 
-' ===== Source module: modBulletListAudit.bas =====
+' ===== Исходный модуль: modBulletListAudit.bas =====
 ' Находит последовательности абзацев с напечатанными тире или маркерами вместо
 ' настоящего форматирования списков Word. Перед изменениями показывает предварительный отчёт.
 ' Проверяйте работу на копии отчёта. Для выполнения требуется Microsoft Word.
@@ -2237,7 +2237,7 @@ Public Sub CheckAndFixWordBulletLists()
         GoTo CleanExit
     End If
 
-    ' Create a same-folder backup only after the user confirms the proposed changes.
+    ' Создаёт резервную копию в той же папке только после подтверждения изменений пользователем.
     backupPath = CreateBulletBackupPath(reportPath)
     FileCopy reportPath, backupPath
     LogBulletBackup ws, backupPath
@@ -2517,7 +2517,7 @@ Private Sub FormatBulletReport(ByVal ws As Worksheet, ByVal lastRow As Long)
 End Sub
 
 
-' ===== Source module: modRenameFiles.bas =====
+' ===== Исходный модуль: modRenameFiles.bas =====
 ' Безопасное переименование файлов по данным существующего перечня.
 ' Столбцы: B — объект, C — номер приложения, D — наименование, G — ссылка на файл.
 ' Перед переименованием показывает предварительный список и запрашивает подтверждение; существующие файлы не перезаписываются.
@@ -2701,9 +2701,9 @@ ContinueRow:
 Failed:
     failure = Err.Description
     If Err.Number = 18 Then failure = "Операция отменена пользователем (Ctrl+Break)."
-    ' If a batch was interrupted, reverse every rename completed in this run.
-    ' Disable another Ctrl+Break while recovery is in progress; otherwise a second
-    ' interruption could stop the rollback halfway through.
+    ' Если пакетная операция была прервана, отменяет все переименования, выполненные в этом запуске.
+    ' На время восстановления отключает повторное прерывание, иначе второй останов
+    ' может помешать завершить откат.
     On Error Resume Next
     Application.EnableCancelKey = xlDisabled
     If Not renamedItems Is Nothing Then
@@ -2806,8 +2806,8 @@ Public Sub RollbackLastRenameBatch()
     End If
 
     batchId = ""
-    ' Select the newest batch based on actual file paths, not journal status alone.
-    ' This lets a partially completed rollback be retried after a previous error.
+    ' Определяет последнюю операцию по фактическим путям файлов, а не только по состоянию журнала.
+    ' Это позволяет повторить незавершённый откат после предыдущей ошибки.
     For r = lastRow To 2 Step -1
         candidateOldPath = CStr(logWs.Cells(r, 4).Value)
         candidateNewPath = CStr(logWs.Cells(r, 6).Value)
@@ -3019,7 +3019,7 @@ Private Sub FormatRenameLog(ByVal ws As Worksheet)
 End Sub
 
 
-' ===== Source module: modDataFull.bas =====
+' ===== Исходный модуль: modDataFull.bas =====
 ' Формирует список уникальных сочетаний раздела и ответственного лица из текущего перечня.
 ' Источник: столбец F — ответственное лицо, столбец H — раздел; заголовки находятся во второй строке, данные — с третьей.
 ' Результат записывается на лист data_full. Пустые значения пропускаются.
@@ -3280,7 +3280,7 @@ Private Function GetUniqueDataFullBackupName() As String
 End Function
 
 
-' ===== Source module: modSafetySupport.bas =====
+' ===== Исходный модуль: modSafetySupport.bas =====
 ' Общие вспомогательные процедуры отмены и обработки ошибок для макросов Excel и Word.
 Public Function IsUserCancellation(ByVal errorNumber As Long) As Boolean
     IsUserCancellation = (errorNumber = 18)
