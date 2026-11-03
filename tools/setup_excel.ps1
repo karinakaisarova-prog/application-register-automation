@@ -1,7 +1,7 @@
 ﻿$ErrorActionPreference = "Stop"
 
 # Устанавливает модули VBA проекта непосредственно в уже созданную рабочую копию книги.
-# If the chosen file is not .xlsm, Excel converts it to .xlsm because other formats cannot store VBA.
+# Если выбранный файл не имеет формат .xlsm, Excel преобразует его в этот формат, поскольку другие форматы не поддерживают макросы.
 # Требуются Windows, настольный Excel и разрешённый программный доступ к объектной модели проекта VBA.
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $vbaDir = Join-Path $repoRoot "src\vba"
