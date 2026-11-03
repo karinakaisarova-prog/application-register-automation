@@ -50,7 +50,7 @@ Public Function GetRegisterWorkbook() As Workbook
     Dim wb As Workbook
     Dim ws As Worksheet
 
-    ' Prefer the workbook explicitly selected by the startup procedure.
+    ' В первую очередь использует книгу, выбранную процедурой запуска.
     On Error Resume Next
     If Not gRegisterWorkbook Is Nothing Then
         Set ws = gRegisterWorkbook.Worksheets(1)
@@ -62,7 +62,7 @@ Public Function GetRegisterWorkbook() As Workbook
     Err.Clear
     On Error GoTo 0
 
-    ' The macro workbook is the intended home for the data sheet and register.
+    ' Лист data и перечень должны находиться в книге с макросами.
     On Error Resume Next
     Set ws = ThisWorkbook.Worksheets("data")
     On Error GoTo 0
@@ -72,7 +72,7 @@ Public Function GetRegisterWorkbook() As Workbook
         Exit Function
     End If
 
-    ' Fallback after a VBA reset: identify a workbook by the register title/header.
+    ' Если состояние VBA сброшено, ищет книгу по заголовку перечня.
     For Each wb In Application.Workbooks
         For Each ws In wb.Worksheets
             If CStr(ws.Range("A1").Value) = "Перечень приложений" Or _
@@ -228,14 +228,14 @@ End Sub
 
 
 ' ===== Source module: modApplicationsList.bas =====
-' Application Register Automation
-' Main list builder for desktop Excel on Windows.
-' Requires no additional VBA references (FileSystemObject and Word are late-bound).
+' Автоматизация перечня приложений
+' Основной макрос формирования перечня в настольном Excel под Windows.
+' Дополнительные ссылки VBA не требуются; объекты файловой системы и Word создаются без предварительного подключения библиотек.
 '
-' Entry point: CreateMultiFolderApplicationsListCorrected
-' Folder depth: up to ApplicationsList_MAX_FOLDER_DEPTH below each selected root.
-' Manual values in column H ("Раздел") are preserved by full file path.
-' No FreezePanes are used.
+' Основная процедура формирования перечня: CreateMultiFolderApplicationsListCorrected
+' Глубина поиска: до ApplicationsList_MAX_FOLDER_DEPTH уровней внутри каждой выбранной папки.
+' Ручные значения столбца H («Раздел») сохраняются по полному пути к файлу.
+' Закрепление областей не используется.
 
 Private Const ApplicationsList_HEADER_ROW As Long = 2
 Private Const ApplicationsList_FIRST_DATA_ROW As Long = 3
@@ -309,7 +309,7 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
     originalSheetName = sheetName
     If targetWasExisting Then
         SaveExistingSections ws, mSections
-        ' Keep a worksheet-level recovery copy before any destructive rebuild.
+        ' Перед перестроением создаёт резервную копию листа для восстановления.
         backupSheetName = GetUniqueBackupSheetName()
         ws.Copy After:=GetRegisterWorkbook().Worksheets(GetRegisterWorkbook().Worksheets.Count)
         Set backupWs = GetRegisterWorkbook().Worksheets(GetRegisterWorkbook().Worksheets.Count)
@@ -367,14 +367,14 @@ Failed:
     If Not backupWs Is Nothing Then
         Application.DisplayAlerts = False
         If Not rebuildStarted Then
-            ' The original sheet has not been changed; discard only the unused copy.
+            ' Исходный лист не менялся; удаляет только ненужную копию.
             backupWs.Delete
             Set backupWs = Nothing
             LogLine "Формирование не началось; исходный лист оставлен без изменений."
         Else
-            ' Never delete the damaged worksheet before the backup has taken
-            ' the original name successfully. If a rename fails, retain the
-            ' backup and leave the remaining worksheet(s) available for recovery.
+            ' Не удаляет повреждённый лист, пока резервная копия не получит его исходное имя.
+            ' Если переименование не удалось, сохраняет резервную копию
+            ' и оставляет доступные листы для восстановления.
             Set damagedWs = Nothing
             Set damagedWs = GetRegisterWorkbook().Worksheets(originalSheetName)
             If damagedWs Is Nothing Then
@@ -427,8 +427,8 @@ Failed:
 CleanExit:
     On Error Resume Next
     If Not backupWs Is Nothing Then
-        ' A remaining backup may be the only recoverable copy after a failed restore.
-        ' Keep it rather than infer success from Err.Number, which may have been cleared.
+        ' После неудачного восстановления резервная копия может остаться единственной доступной копией.
+        ' Сохраняет её, не полагаясь на Err.Number, который мог быть сброшен.
         LogLine "Резервная копия сохранена для проверки: " & backupWs.Name
     End If
     Application.ScreenUpdating = oldScreenUpdating
@@ -513,7 +513,7 @@ Private Sub CollectFiles(ByVal rootPath As String, ByVal currentPath As String, 
 
 FolderError:
     If Err.Number = 18 Then
-        ' Do not swallow Ctrl+Break; let the top-level handler restore Excel state.
+        ' Не подавляет Ctrl+Break: основной обработчик должен восстановить настройки Excel.
         Err.Raise 18
     End If
     LogLine "Не удалось прочитать папку: " & currentPath & " (" & Err.Description & ")"
@@ -586,8 +586,8 @@ Private Function GetObjectName(ByVal currentPath As String, ByVal fileName As St
     Dim candidate As String
     Dim objectNames As Variant
 
-    ' Only inspect folders inside the selected root, including the root itself.
-    ' A parent folder outside the selected root must not determine the object.
+    ' Проверяет только выбранную папку и вложенные в неё папки.
+    ' Родительская папка за пределами выбранной не должна определять объект.
     objectNames = Array("КЗТ", "СМТ", "АМТ", "Саратов", "НТУ", "КТ")
     Set fso = CreateObject("Scripting.FileSystemObject")
     folderPath = RemoveTrailingSlash(currentPath)
@@ -601,15 +601,15 @@ Private Function GetObjectName(ByVal currentPath As String, ByVal fileName As St
             Exit Function
         End If
 
-        ' Stop after checking the selected root; never inspect its parent.
+        ' После проверки выбранной папки не проверяет родительские папки.
         If StrComp(folderPath, selectedRootPath, vbTextCompare) = 0 Then Exit Do
         parentPath = fso.GetParentFolderName(folderPath)
         If Len(parentPath) = 0 Or StrComp(parentPath, folderPath, vbTextCompare) = 0 Then Exit Do
         folderPath = RemoveTrailingSlash(parentPath)
     Loop
 
-    ' If no approved object was found in the selected folder chain, inspect
-    ' the filename. Return blank rather than guessing an unapproved object.
+    ' Если в пути выбранной папки не найден подходящий объект, проверяет имя файла.
+    ' Если объект определить нельзя, оставляет значение пустым, а не угадывает.
     GetObjectName = FindObjectInText(fileName, objectNames)
 End Function
 
@@ -624,7 +624,7 @@ Private Function FindObjectInText(ByVal sourceText As String, ByVal objectNames 
 
     For i = LBound(objectNames) To UBound(objectNames)
         objectName = CStr(objectNames(i))
-        ' Match a complete code/name, not a substring inside another word.
+        ' Ищет полное обозначение или название, а не часть другого слова.
         rx.Pattern = "(^|[^А-Яа-яЁёA-Za-z0-9])" & objectName & "([^А-Яа-яЁёA-Za-z0-9]|$)"
         If rx.Test(sourceText) Then
             FindObjectInText = objectName
@@ -760,7 +760,7 @@ Private Sub CheckDuplicateApplicationNumbers(ByVal ws As Worksheet)
     Set counts = CreateObject("Scripting.Dictionary")
     counts.CompareMode = vbTextCompare
 
-    ' Count each application number separately within each object.
+    ' Считает номера приложений отдельно для каждого объекта.
     For r = ApplicationsList_FIRST_DATA_ROW To lastRow
         objectName = Trim$(CStr(ws.Cells(r, 2).Value))
         appNumber = Trim$(CStr(ws.Cells(r, 3).Value))
@@ -774,7 +774,7 @@ Private Sub CheckDuplicateApplicationNumbers(ByVal ws As Worksheet)
         End If
     Next r
 
-    ' Highlight every row participating in a duplicate, and record it in the run log.
+    ' Выделяет все строки с повторяющимися номерами и записывает их в журнал запуска.
     For r = ApplicationsList_FIRST_DATA_ROW To lastRow
         objectName = Trim$(CStr(ws.Cells(r, 2).Value))
         appNumber = Trim$(CStr(ws.Cells(r, 3).Value))
@@ -805,8 +805,8 @@ Private Function NormalizeApplicationNumberForDuplicateCheck(ByVal appNumber As 
     Dim value As String
     value = UCase$(Trim$(appNumber))
 
-    ' Leading zeros do not make a different application number (01 = 1, 001A = 1A).
-    ' Preserve a trailing letter suffix because 1A and 1B are distinct numbers.
+    ' Начальные нули не создают новый номер: 01 считается номером 1, а 001A — номером 1A.
+    ' Сохраняет буквенный суффикс, поскольку 1A и 1B — разные номера.
     Do While Len(value) > 1 And Left$(value, 1) = "0" And _
              Mid$(value, 2, 1) >= "0" And Mid$(value, 2, 1) <= "9"
         value = Mid$(value, 2)
@@ -828,8 +828,8 @@ Private Sub ApplyLookups(ByVal ws As Worksheet)
     lastRow = ws.Cells(ws.Rows.Count, 4).End(xlUp).Row
     For r = ApplicationsList_FIRST_DATA_ROW To lastRow
         appName = Trim$(CStr(ws.Cells(r, 4).Value))
-        ' The exact source filename was checked while building the row. Preserve
-        ' its special dash here; do not infer special status from a generic title.
+        ' Точное имя исходного файла проверено при формировании строки. Сохраняет
+        ' специальное тире и не определяет его только по общему названию.
         If Trim$(CStr(ws.Cells(r, 5).Value)) <> "—" Then
             ws.Cells(r, 5).FormulaLocal = "=ЕСЛИОШИБКА(ИНДЕКС(data!$B:$B;ПОИСКПОЗ($D" & r & ";data!$A:$A;0));"""")"
         End If
@@ -845,7 +845,7 @@ Private Function IsSpecialDepartmentFile(ByVal fileNameOrNumber As String, ByVal
     baseName = fso.GetBaseName(fileNameOrNumber)
     normalizedFile = LCase$(Trim$(Replace(baseName, "ё", "е")))
 
-    ' Match only exact base filenames, never a generic parsed title.
+    ' Сопоставляет только точные базовые имена файлов, а не общее разобранное название.
     IsSpecialDepartmentFile = (normalizedFile = "отчет_2 кв 2026" Or _
                                normalizedFile = "реестр рисков")
 End Function
@@ -945,9 +945,9 @@ End Sub
 
 
 ' ===== Source module: modReportAnalysis.bas =====
-' Word report analysis. Uses late binding; Microsoft Word must be installed.
-' Results are written to worksheet "Упоминания отчёта".
-' This module does not modify the source report.
+' Анализирует отчёт Word; для выполнения требуется Microsoft Word.
+' Результаты записываются на лист «Упоминания отчёта».
+' Исходный отчёт не изменяется.
 
 Private Const ReportAnalysis_RESULT_SHEET As String = "Упоминания отчёта"
 Private Const ReportAnalysis_FIRST_RESULT_ROW As Long = 2
@@ -1010,7 +1010,7 @@ Public Sub ScanWordReportMentions()
     wdApp.Visible = False
     Set wdDoc = wdApp.Documents.Open(reportPath, False, True, False)
 
-    ' Preserve previous results until the new scan completes successfully.
+    ' Сохраняет предыдущий результат, пока новая проверка не завершится успешно.
     On Error Resume Next
     Set ws = GetRegisterWorkbook().Worksheets(ReportAnalysis_RESULT_SHEET)
     On Error GoTo Failed
@@ -1099,7 +1099,7 @@ Failed:
     If Not wdDoc Is Nothing Then wdDoc.Close False
     If Not wdApp Is Nothing Then wdApp.Quit
 
-    ' Roll back the output sheet so a failed/cancelled scan cannot leave partial results.
+    ' Восстанавливает прежний лист результата, чтобы после ошибки или отмены не осталось неполных данных.
     If Not backupWs Is Nothing Then
         Application.DisplayAlerts = False
         Set damagedWs = ws
@@ -1206,7 +1206,7 @@ Public Sub CountPagesForRegister()
         GoTo CleanExit
     End If
 
-    ' Keep the original page-count column so Ctrl+Break or a fatal error can roll back.
+    ' Сохраняет исходный столбец количества страниц для восстановления после прерывания или критической ошибки.
     oldPageValues = ws.Range("J3:J" & lastRow).Formula
     pageSnapshotTaken = True
 
@@ -1269,7 +1269,7 @@ NextRow:
 
 FileFailed:
     If Err.Number = 18 Then
-        ' Ctrl+Break must reach the top-level handler so Excel state is restored.
+        ' Прерывание Ctrl+Break должно дойти до основного обработчика, чтобы восстановить настройки Excel.
         GoTo Failed
     End If
     failed = failed + 1
@@ -1344,7 +1344,7 @@ PdfUnavailable:
     Set pdfDoc = Nothing
     On Error GoTo 0
 
-    ' Do not swallow Ctrl+Break: let the caller restore the page-count snapshot.
+    ' Не подавляет Ctrl+Break: вызывающая процедура должна восстановить сохранённые значения количества страниц.
     If savedErrNumber = 18 Then
         Err.Raise savedErrNumber, "CountPdfPagesWithAcrobat", savedErrDescription
     End If
@@ -1370,7 +1370,7 @@ Private Function CountWorkbookPrintPages(ByVal wb As Workbook) As Long
         pageBreakDescription = Err.Description
         On Error GoTo 0
 
-        ' Do not let the local best-effort page-break handling swallow Ctrl+Break.
+        ' Не позволяет локальной обработке разрывов страниц подавить Ctrl+Break.
         If pageBreakError = 18 Then
             Err.Raise pageBreakError, "CountWorkbookPrintPages", pageBreakDescription
         ElseIf pageBreakError <> 0 Then
@@ -1453,10 +1453,10 @@ End Sub
 
 
 ' ===== Source module: modTableNumbering.bas =====
-' Checks every table exposed by Word's document Tables collection.
-' Produces a preview on an Excel sheet before modifying the Word document.
-' Missing captions are inserted as Word SEQ fields, then document fields are updated.
-' Word is automated late-bound; Microsoft Word must be installed.
+' Проверяет все таблицы документа Word.
+' Перед изменением документа формирует предварительный отчёт на листе Excel.
+' Для таблиц без подписи добавляет автоматические поля SEQ и обновляет поля документа.
+' Для выполнения требуется Microsoft Word.
 
 Private Const TableNumbering_TABLE_REPORT_SHEET As String = "Проверка таблиц"
 Private Const TableNumbering_FIRST_DATA_ROW As Long = 2
@@ -1573,7 +1573,7 @@ Public Sub CheckAndNumberWordTables()
 
     FormatTableReport ws, r - 1
 
-    ' Commit only after the scan and formatting are complete.
+    ' Заменяет предыдущий отчёт только после завершения проверки и форматирования.
     If Not priorWs Is Nothing Then
         priorBackupName = GetUniqueTableAuditSheetName("_bak_table_audit")
         priorWs.Name = priorBackupName
@@ -1628,7 +1628,7 @@ Public Sub CheckAndNumberWordTables()
         GoTo CleanExit
     End If
 
-    ' Create a same-folder backup only after the user confirms the proposed changes.
+    ' Создаёт резервную копию в той же папке только после подтверждения изменений пользователем.
     backupPath = CreateWordBackupPath(reportPath)
     FileCopy reportPath, backupPath
     LogTableBackup ws, backupPath
@@ -1636,7 +1636,7 @@ Public Sub CheckAndNumberWordTables()
 
     EnsureTableCaptionLabel wdDoc
 
-    ' Iterate backwards so inserting captions does not disturb positions of tables not yet processed.
+    ' Обрабатывает таблицы с конца документа, чтобы вставка подписей не смещала расположение ещё не проверенных таблиц.
     For r = tableCount To 1 Step -1
         DoEvents
         Set tbl = wdDoc.Tables(r)
@@ -1913,7 +1913,7 @@ Private Function HasTableSequenceField(ByVal wdDoc As Object, ByVal tableStart A
     For paraIndex = wdDoc.Paragraphs.Count To 1 Step -1
         Set para = wdDoc.Paragraphs(paraIndex).Range
         If para.Start >= tableStart Or para.Information(TableNumbering_WD_WITHIN_TABLE) Then
-            ' Skip the current table and paragraphs inside any earlier table.
+            ' Пропускает текущую таблицу и абзацы внутри предыдущих таблиц.
         ElseIf para.End <= tableStart Then
             checkedParagraphs = checkedParagraphs + 1
             paraText = CStr(para.Text)
@@ -1951,7 +1951,7 @@ Private Function GetPreviousCaptionText(ByVal wdDoc As Object, ByVal tableStart 
     For paraIndex = wdDoc.Paragraphs.Count To 1 Step -1
         Set para = wdDoc.Paragraphs(paraIndex).Range
         If para.Start >= tableStart Then
-            ' Skip paragraphs at or inside the current table.
+            ' Пропускает абзацы, расположенные в текущей таблице или внутри неё.
         ElseIf para.End <= tableStart Then
             If para.Information(TableNumbering_WD_WITHIN_TABLE) = False Then
                 checkedParagraphs = checkedParagraphs + 1
@@ -2044,9 +2044,9 @@ End Sub
 
 
 ' ===== Source module: modBulletListAudit.bas =====
-' Finds consecutive paragraphs that use typed dash/bullet characters instead of
-' Word's native list formatting. Shows a preview before any edits.
-' Tests should be run on a copy of the report. Microsoft Word must be installed.
+' Находит последовательности абзацев с напечатанными тире или маркерами вместо
+' настоящего форматирования списков Word. Перед изменениями показывает предварительный отчёт.
+' Проверяйте работу на копии отчёта. Для выполнения требуется Microsoft Word.
 
 Private Const BulletListAudit_BULLET_REPORT_SHEET As String = "Проверка списков"
 Private Const BulletListAudit_FIRST_DATA_ROW As Long = 2
@@ -2111,7 +2111,7 @@ Public Sub CheckAndFixWordBulletLists()
     wdApp.Visible = False
     Set wdDoc = wdApp.Documents.Open(reportPath, False, False, False)
 
-    ' Scan into a staging sheet so interruption cannot erase the previous report.
+    ' Сначала формирует отчёт на временном листе, чтобы при прерывании не потерять предыдущий отчёт.
     On Error Resume Next
     Set priorWs = GetRegisterWorkbook().Worksheets(BulletListAudit_BULLET_REPORT_SHEET)
     On Error GoTo Failed
@@ -2152,7 +2152,7 @@ Public Sub CheckAndFixWordBulletLists()
                 runEnd = j - 1
                 runLength = runEnd - runStart + 1
 
-                ' Avoid converting isolated dash-led paragraphs: they may be ordinary prose.
+                ' Не преобразует одиночные абзацы с тире: это может быть обычный текст.
                 If runLength >= 2 Then
                     If unsafeGroup Then unsafeGroupsFound = unsafeGroupsFound + 1
                     groupNo = groupNo + 1
@@ -2189,7 +2189,7 @@ Public Sub CheckAndFixWordBulletLists()
 
     FormatBulletReport ws, rowOut - 1
 
-    ' Commit the completed scan by swapping sheet names only after all rows are ready.
+    ' Заменяет предыдущий отчёт только после подготовки всех строк.
     If Not priorWs Is Nothing Then
         priorBackupName = GetUniqueBulletAuditSheetName("_bak_bullet_audit")
         priorWs.Name = priorBackupName
@@ -2243,7 +2243,7 @@ Public Sub CheckAndFixWordBulletLists()
     LogBulletBackup ws, backupPath
     changesStarted = True
 
-    ' Process groups from the end of the document backwards so earlier paragraph indexes remain valid.
+    ' Обрабатывает группы с конца документа, чтобы номера предыдущих абзацев не смещались.
     Dim groupStartRows() As Long, groupEndRows() As Long, groupCount As Long
     Dim rr As Long, priorGroup As Variant
     ReDim groupStartRows(1 To groupsFound)
@@ -2273,7 +2273,7 @@ Public Sub CheckAndFixWordBulletLists()
             offset = 0
             removeLen = 0
             If GetTypedMarker(CleanBulletParagraphText(rawText), offset, removeLen) Then
-                ' offset includes leading whitespace; preserve indentation before the marker.
+                ' Смещение включает начальные пробелы; сохраняет отступ перед маркером.
                 Dim leadingSpaces As Long, cleanText As String
                 cleanText = CleanBulletParagraphText(rawText)
                 leadingSpaces = 0
@@ -2293,7 +2293,7 @@ Public Sub CheckAndFixWordBulletLists()
     Next g
 
     wdDoc.Save
-    ' Update the audit sheet status; preserve the original preview text.
+    ' Обновляет состояние проверки, сохраняя исходный текст предварительного отчёта.
     ws.Range("E2:E" & rowOut - 1).Value = "Исправлено: применён маркированный список Word"
     MsgBox "Исправление завершено." & vbCrLf & _
            "Групп преобразовано: " & groupCount & vbCrLf & _
@@ -2518,9 +2518,9 @@ End Sub
 
 
 ' ===== Source module: modRenameFiles.bas =====
-' Safe file renaming from the existing register sheet.
-' Columns: B=Object, C=Application number, D=Title, G=File hyperlink.
-' Preview + explicit confirmation; never overwrites an existing destination.
+' Безопасное переименование файлов по данным существующего перечня.
+' Столбцы: B — объект, C — номер приложения, D — наименование, G — ссылка на файл.
+' Перед переименованием показывает предварительный список и запрашивает подтверждение; существующие файлы не перезаписываются.
 
 Private Const RenameFiles_FIRST_DATA_ROW As Long = 3
 Private Const RenameFiles_COL_OBJECT As Long = 2
@@ -2599,9 +2599,9 @@ Public Sub RenameFilesFromRegister()
         newName = CleanFileName(objectName & "_Приложение № " & appNo & "_" & titleText) & ext
         newPath = Left$(oldPath, InStrRev(oldPath, Application.PathSeparator)) & newName
 
-        ' The first row with complete naming fields is the candidate for this source,
-        ' even when its name is already correct or the target is blocked. Later rows
-        ' must not rename the same physical file using a different register row.
+        ' Для каждого исходного файла используется первая строка с полными данными для имени,
+        ' даже если имя уже правильное или целевой файл занят. Следующие строки
+        ' не должны повторно переименовывать тот же файл по другим данным перечня.
         seenSource(oldPath) = r
         If StrComp(oldPath, newPath, vbTextCompare) = 0 Then
             problems = problems & "Строка " & r & ": имя файла уже соответствует полям перечня; переименование не требуется." & vbCrLf
@@ -2655,7 +2655,7 @@ ContinueRow:
     For Each item In plan
         DoEvents
         failure = TryRenameFile(CStr(item("OldPath")), CStr(item("NewPath")))
-        ' Track the filesystem change immediately, before any worksheet/log operations can fail.
+        ' Сразу фиксирует изменение файла, прежде чем операции с листом или журналом смогут завершиться ошибкой.
         If Len(failure) = 0 Then renamedItems.Add item
         logWs.Cells(logRow, 1).Value = Now
         logWs.Cells(logRow, 2).Value = ws.Name
@@ -2664,9 +2664,9 @@ ContinueRow:
         logWs.Cells(logRow, 5).Value = item("NewName")
         logWs.Cells(logRow, 6).Value = item("NewPath")
         If Len(failure) = 0 Then
-            ' A successful filesystem rename is not enough: the register must point to it.
-            ' If hyperlink replacement fails, raise into the batch handler so the file rename
-            ' is rolled back rather than leaving a stale or missing link.
+            ' Одного успешного переименования файла недостаточно: ссылка в перечне тоже должна измениться.
+            ' Если заменить ссылку не удалось, передаёт ошибку общему обработчику, чтобы отменить переименование
+            ' и не оставлять устаревшую или неработающую ссылку.
             On Error Resume Next
             Err.Clear
             ws.Cells(CLng(item("Row")), RenameFiles_COL_LINK).Hyperlinks.Delete
@@ -2707,7 +2707,7 @@ Failed:
     On Error Resume Next
     Application.EnableCancelKey = xlDisabled
     If Not renamedItems Is Nothing Then
-        ' Undo in reverse order, like a transaction stack.
+        ' Отменяет изменения в обратном порядке.
         For rollbackIndex = renamedItems.Count To 1 Step -1
             Set rollbackItem = renamedItems(rollbackIndex)
             rollbackError = TryRenameFile(CStr(rollbackItem("NewPath")), CStr(rollbackItem("OldPath")))
@@ -2720,7 +2720,7 @@ Failed:
                     problems = problems & "Файл возвращён, но ссылка в строке " & CLng(rollbackItem("Row")) & _
                                " не восстановлена: " & rollbackError & vbCrLf
                 End If
-                ' Journal records both filesystem recovery and any hyperlink repair problem.
+                ' Журнал фиксирует и восстановление файлов, и возможные проблемы с исправлением ссылок.
                 If Not logWs Is Nothing And Len(batchId) > 0 Then
                     For r = 2 To logWs.Cells(logWs.Rows.Count, 1).End(xlUp).Row
                         If Trim$(CStr(logWs.Cells(r, 8).Value)) = batchId And _
@@ -2835,7 +2835,7 @@ Public Sub RollbackLastRenameBatch()
             oldPath = CStr(logWs.Cells(r, 4).Value)
             newPath = CStr(logWs.Cells(r, 6).Value)
             If Len(Dir$(oldPath)) > 0 And Len(Dir$(newPath)) = 0 Then
-                ' Filesystem already reflects a completed rollback; reconcile the journal.
+                ' Файловая система уже отражает завершённый откат; приводит журнал в соответствие.
                 logWs.Cells(r, 7).Value = "Откатан"
             ElseIf Len(Dir$(newPath)) = 0 Or Len(Dir$(oldPath)) > 0 Then
                 logWs.Cells(r, 7).Value = "Откат пропущен: конфликт путей (проверьте оба имени)"
@@ -2843,7 +2843,7 @@ Public Sub RollbackLastRenameBatch()
             Else
                 errText = TryRenameFile(newPath, oldPath)
                 If Len(errText) = 0 Then
-                    ' Track immediately after the filesystem change so interruption recovery can find it.
+                    ' Фиксирует изменение сразу после операции с файлом, чтобы восстановление после прерывания могло его обнаружить.
                     Set doneItem = CreateObject("Scripting.Dictionary")
                     doneItem("LogRow") = r
                     doneItem("OldPath") = oldPath
@@ -2886,10 +2886,10 @@ Public Sub RollbackLastRenameBatch()
 Failed:
     failure = Err.Description
     If Err.Number = 18 Then failure = "Операция отменена пользователем (Ctrl+Break)."
-    ' Best-effort recovery: restore files already renamed back to their post-rename paths.
+    ' Пытается вернуть файлы, уже переименованные в этом запуске, к состоянию после переименования.
     On Error Resume Next
     Application.EnableCancelKey = xlDisabled
-    ' Reverse the rollback actions in reverse order to restore the pre-rollback state.
+    ' Отменяет действия отката в обратном порядке, чтобы вернуть состояние до начала отката.
     For recoveryIndex = reversedItems.Count To 1 Step -1
         Set item = reversedItems(recoveryIndex)
         recoveryError = TryRenameFile(CStr(item("OldPath")), CStr(item("NewPath")))
@@ -3020,9 +3020,9 @@ End Sub
 
 
 ' ===== Source module: modDataFull.bas =====
-' Builds a unique list of Section + Responsible Person pairs from the active register.
-' Source columns: F = Responsible Person, H = Section; headers are on row 2, data starts on row 3.
-' Output sheet: data_full. Blank values are ignored.
+' Формирует список уникальных сочетаний раздела и ответственного лица из текущего перечня.
+' Источник: столбец F — ответственное лицо, столбец H — раздел; заголовки находятся во второй строке, данные — с третьей.
+' Результат записывается на лист data_full. Пустые значения пропускаются.
 
 Private Const DataFull_SOURCE_FIRST_ROW As Long = 3
 Private Const DataFull_COL_RESPONSIBLE As Long = 6
@@ -3099,7 +3099,7 @@ Public Sub BuildDataFull()
     On Error GoTo Failed
     outputWasExisting = Not outputWs Is Nothing
 
-    ' Keep a full worksheet copy until the rebuild has completed successfully.
+    ' Сохраняет полную копию листа, пока перестроение не завершится успешно.
     If outputWasExisting Then
         outputWs.Copy After:=GetRegisterWorkbook().Worksheets(GetRegisterWorkbook().Worksheets.Count)
         Set backupWs = ActiveSheet
@@ -3161,7 +3161,7 @@ Failed:
     failureText = Err.Description
     wasCancelled = (Err.Number = 18)
 
-    ' Restore the previous output if an error or Ctrl+Break occurs mid-rebuild.
+    ' Восстанавливает предыдущий результат, если во время перестроения возникла ошибка или пользователь прервал выполнение.
     On Error Resume Next
     Application.DisplayAlerts = False
     If Not backupWs Is Nothing Then
@@ -3281,7 +3281,7 @@ End Function
 
 
 ' ===== Source module: modSafetySupport.bas =====
-' Common cancellation/error helpers for macros that use Excel and Word automation.
+' Общие вспомогательные процедуры отмены и обработки ошибок для макросов Excel и Word.
 Public Function IsUserCancellation(ByVal errorNumber As Long) As Boolean
     IsUserCancellation = (errorNumber = 18)
 End Function
