@@ -451,22 +451,42 @@ RenameError:
 End Function
 
 Private Function RegisterFilePath(ByVal c As Range) As String
+    Dim linkAddress As String
     On Error Resume Next
     If c.Hyperlinks.Count > 0 Then
-        RegisterFilePath = CStr(c.Hyperlinks(1).Address)
-        If Len(RegisterFilePath) = 0 Then RegisterFilePath = CStr(c.Hyperlinks(1).SubAddress)
+        linkAddress = Trim$(CStr(c.Hyperlinks(1).Address))
+        If Len(linkAddress) = 0 Then Exit Function
+        RegisterFilePath = linkAddress
     Else
-        RegisterFilePath = CStr(c.Value)
+        RegisterFilePath = Trim$(CStr(c.Value))
     End If
     On Error GoTo 0
     RegisterFilePath = NormalizeRegisterPath(RegisterFilePath)
 End Function
 
 Private Function NormalizeRegisterPath(ByVal value As String) As String
+    Dim lowerValue As String
     value = Trim$(value)
-    If LCase$(Left$(value, 8)) = "file:///" Then value = Mid$(value, 9)
+    lowerValue = LCase$(value)
+
+    If Len(value) = 0 Then Exit Function
+
+    If Left$(lowerValue, 8) = "file:///" Then
+        value = Mid$(value, 9)
+        value = Replace(value, "/", "\")
+    ElseIf Left$(lowerValue, 7) = "file://" Then
+        value = "\\" & Mid$(value, 8)
+        value = Replace(value, "/", "\")
+    ElseIf InStr(1, value, "://", vbTextCompare) > 0 Or _
+           Left$(lowerValue, 7) = "mailto:" Or _
+           Left$(lowerValue, 5) = "ftp:/" Then
+        Exit Function
+    Else
+        value = Replace(value, "/", "\")
+    End If
+
     value = Replace(value, "%20", " ")
-    value = Replace(value, "/", "\")
+    If Not (Mid$(value, 2, 2) = ":\") And Left$(value, 2) <> "\\" Then Exit Function
     NormalizeRegisterPath = value
 End Function
 
