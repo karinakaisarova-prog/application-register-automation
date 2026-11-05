@@ -323,7 +323,25 @@ Public Sub RollbackLastRenameBatch()
                    Left$(statusText, Len("Файл возвращён; ошибка восстановления ссылки:")) = "Файл возвращён; ошибка восстановления ссылки:" Or _
                    statusText = "Откатан" Or _
                    statusText = "Автоматически отменён после прерывания" Then
-                    If statusText <> "Откатан" Then logWs.Cells(r, 7).Value = "Откатан"
+                    sheetName = CStr(logWs.Cells(r, 2).Value)
+                    registerRow = CLng(Val(logWs.Cells(r, 3).Value))
+                    Set registerWs = Nothing
+                    On Error Resume Next
+                    Set registerWs = GetRegisterWorkbook().Worksheets(sheetName)
+                    On Error GoTo Failed
+                    recoveryError = ""
+                    If Not registerWs Is Nothing And registerRow > 0 Then
+                        recoveryError = RestoreRegisterHyperlink(registerWs, registerRow, oldPath)
+                    Else
+                        recoveryError = "Не найден лист или строка перечня для обновления ссылки."
+                    End If
+                    If Len(recoveryError) = 0 Then
+                        logWs.Cells(r, 7).Value = "Откатан"
+                        restored = restored + 1
+                    Else
+                        logWs.Cells(r, 7).Value = "Файл возвращён; ошибка восстановления ссылки: " & recoveryError
+                        skipped = skipped + 1
+                    End If
                 Else
                     logWs.Cells(r, 7).Value = "Не требует отката: успешное переименование не подтверждено журналом"
                     skipped = skipped + 1
