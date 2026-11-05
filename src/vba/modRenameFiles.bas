@@ -317,7 +317,10 @@ Public Sub RollbackLastRenameBatch()
         If Trim$(CStr(logWs.Cells(r, 8).Value)) = batchId Then
             oldPath = CStr(logWs.Cells(r, 4).Value)
             newPath = CStr(logWs.Cells(r, 6).Value)
-            If Len(Dir$(oldPath)) > 0 And Len(Dir$(newPath)) = 0 Then
+            If Left$(statusText, Len("Ошибка:")) = "Ошибка:" Then
+                logWs.Cells(r, 7).Value = "Не требует отката: исходное переименование не выполнено"
+                skipped = skipped + 1
+            ElseIf Len(Dir$(oldPath)) > 0 And Len(Dir$(newPath)) = 0 Then
                 ' Не считает файл откатанным только по расположению: проверяет, что журнал подтверждает исходное переименование.
                 If statusText = "Переименован" Or _
                    Left$(statusText, Len("Файл возвращён; ошибка восстановления ссылки:")) = "Файл возвращён; ошибка восстановления ссылки:" Or _
