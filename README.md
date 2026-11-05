@@ -120,22 +120,19 @@
 Подробное описание фактического поведения модулей и известных ограничений: [docs/current-state.md](docs/current-state.md). Это описание исходного кода, а не подтверждение успешной компиляции или выполнения в Excel.
 
 
-### Word backup and recovery
+### Резервное копирование документов Word
 
-The table-numbering and bullet-list macros now create a timestamped backup beside the selected Word document after the user confirms changes. The backup is retained, its path is reported, and the error handler attempts to restore the original file from it. This behavior is not yet runtime-tested; see `tests/test-checklist.md` before relying on it for production documents.
+Макросы нумерации таблиц и проверки маркированных списков после подтверждения изменений создают резервную копию выбранного документа Word с отметкой времени в имени файла. Копия сохраняется рядом с исходным документом, её путь выводится пользователю, а обработчик ошибок пытается восстановить исходный файл из копии. Работа этого механизма ещё не проверена при реальном запуске. Перед использованием см. `tests/test-checklist.md`.
 
+### Обработка прерывания переименования
 
-### Rename interruption handling
+Макрос переименования запоминает успешно выполненные операции текущего запуска и пытается отменить их, если работа прервана или возникла ошибка. Это восстановление по возможности, а не гарантия полной транзакционной целостности. После проверки необходимо сверить журнал и фактические пути файлов.
 
-The rename macro now tracks successful operations during the current run and attempts to reverse them if the run is interrupted or raises an error. This is best-effort recovery, not a transactional guarantee; validate the log and actual file paths after testing.
+### Откат анализа отчёта
 
+`ScanWordReportMentions` перед заменой содержимого листа результатов создаёт его временную копию. При обработанной ошибке или Ctrl+Break макрос пытается восстановить прежний лист; если листа результатов раньше не было, он пытается удалить частично заполненный лист. `CountPagesForRegister` сохраняет прежние значения и формулы столбца J и пытается восстановить их после критической ошибки или Ctrl+Break. Отдельные недоступные файлы по-прежнему отмечаются в соответствующих строках.
 
-### Report-analysis rollback
-
-`ScanWordReportMentions` now makes a temporary copy of the existing results sheet before replacing its contents. On a handled error or Ctrl+Break it attempts to restore the previous sheet; if there was no previous results sheet, it attempts to remove the partial one. `CountPagesForRegister` snapshots the existing values/formulas in column J and attempts to restore them after a fatal error or Ctrl+Break. Individual unreadable files are still marked in their own rows.
-
-These are best-effort recovery paths and have **not** been tested in a running Excel/Word environment. Workbook structure protection or an unexpected Excel/COM failure can prevent restoration. See the added cases in `tests/test-checklist.md`.
-
+Это механизмы восстановления с ограниченной гарантией; они **ещё не проверены** при реальном запуске Excel/Word. Защита структуры книги или непредвиденная ошибка Excel/COM могут помешать восстановлению. Дополнительные сценарии проверки приведены в `tests/test-checklist.md`.
 
 ### Журнал при прерывании пакетного переименования
 
