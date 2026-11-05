@@ -318,14 +318,15 @@ Public Sub RollbackLastRenameBatch()
             oldPath = CStr(logWs.Cells(r, 4).Value)
             newPath = CStr(logWs.Cells(r, 6).Value)
             If Len(Dir$(oldPath)) > 0 And Len(Dir$(newPath)) = 0 Then
-                ' После неудачного переименования исходный путь может сохраниться, а новый — отсутствовать.
-                ' Не отмечает строку как отменённую, если переименование фактически не выполнялось.
-                If Left$(statusText, Len("Ошибка:")) = "Ошибка:" Then
-                    logWs.Cells(r, 7).Value = "Не требует отката: исходное переименование не выполнено"
-                    skipped = skipped + 1
+                ' Не считает файл откатанным только по расположению: проверяет, что журнал подтверждает исходное переименование.
+                If statusText = "Переименован" Or _
+                   Left$(statusText, Len("Файл возвращён; ошибка восстановления ссылки:")) = "Файл возвращён; ошибка восстановления ссылки:" Or _
+                   statusText = "Откатан" Or _
+                   statusText = "Автоматически отменён после прерывания" Then
+                    If statusText <> "Откатан" Then logWs.Cells(r, 7).Value = "Откатан"
                 Else
-                    ' Файловая система уже отражает завершённый откат; приводит журнал в соответствие.
-                    logWs.Cells(r, 7).Value = "Откатан"
+                    logWs.Cells(r, 7).Value = "Не требует отката: успешное переименование не подтверждено журналом"
+                    skipped = skipped + 1
                 End If
             ElseIf Len(Dir$(newPath)) = 0 Or Len(Dir$(oldPath)) > 0 Then
                 logWs.Cells(r, 7).Value = "Откат пропущен: конфликт путей (проверьте оба имени)"
