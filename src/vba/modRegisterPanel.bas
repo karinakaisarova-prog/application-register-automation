@@ -14,6 +14,7 @@ Private Const BUTTON_GAP As Double = 6
 Public Sub AddRegisterControlPanel()
     Dim ws As Worksheet
 
+    On Error GoTo WorkbookNotFound
     Set ws = GetActiveRegisterSheet()
     If ws Is Nothing Then
         MsgBox "Не найден лист перечня в книге результата. Сначала сформируйте перечень и откройте его лист.", _
@@ -24,6 +25,11 @@ Public Sub AddRegisterControlPanel()
     CreateRegisterControlPanel ws
     MsgBox "Панель макросов добавлена справа от таблицы. Если её не видно, прокрутите лист вправо.", _
            vbInformation, "Панель макросов"
+    Exit Sub
+
+WorkbookNotFound:
+    MsgBox "Не удалось определить книгу с листом «data». Откройте книгу с исходными данными и повторите запуск.", _
+           vbExclamation, "Панель макросов"
 End Sub
 
 Public Sub CreateRegisterControlPanel(ByVal ws As Worksheet)
