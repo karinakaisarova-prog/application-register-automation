@@ -70,7 +70,7 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
                 roots.Add NormalizeSelectedRootPath(CStr(rootItem))
             Next rootItem
         End With
-    ElseIf MsgBox("Вставить веб-адрес SharePoint?", vbYesNo + vbQuestion, "SharePoint") = vbYes Then
+    Else
         Dim sharePointUrl As String
         sharePointUrl = Trim$(InputBox("Вставьте полный адрес папки SharePoint, начиная с http:// или https://", _
                                        "Адрес папки SharePoint"))
@@ -80,8 +80,6 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
             GoTo CleanExit
         End If
         roots.Add NormalizeSelectedRootPath(sharePointUrl)
-    Else
-        GoTo CleanExit
     End If
 
     sheetName = SafeSheetName(GetFolderName(CStr(roots(1))))
