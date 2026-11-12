@@ -75,7 +75,8 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
         sharePointUrl = Trim$(InputBox("Вставьте полный адрес папки SharePoint, начиная с http:// или https://", _
                                        "Адрес папки SharePoint"))
         If Len(sharePointUrl) = 0 Then GoTo CleanExit
-        If InStr(1, sharePointUrl, "://", vbTextCompare) = 0 Then
+        If LCase$(Left$(sharePointUrl, 7)) <> "http://" And _
+           LCase$(Left$(sharePointUrl, 8)) <> "https://" Then
             MsgBox "Укажите полный веб-адрес, начинающийся с http:// или https://.", vbExclamation, "Неверный адрес"
             GoTo CleanExit
         End If
