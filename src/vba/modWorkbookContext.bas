@@ -52,11 +52,14 @@ Public Function GetRegisterWorkbook() As Workbook
     ' В первую очередь использует книгу, явно выбранную процедурой запуска.
     On Error Resume Next
     If Not gRegisterWorkbook Is Nothing Then
-        Set ws = gRegisterWorkbook.Worksheets(1)
-        If Err.Number = 0 Then
+        Set ws = Nothing
+        Set ws = gRegisterWorkbook.Worksheets("data")
+        If Err.Number = 0 And Not ws Is Nothing Then
             Set GetRegisterWorkbook = gRegisterWorkbook
             Exit Function
         End If
+        Err.Clear
+        Set gRegisterWorkbook = Nothing
     End If
     Err.Clear
     On Error GoTo 0
