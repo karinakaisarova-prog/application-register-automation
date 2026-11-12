@@ -238,6 +238,7 @@ Failed:
             End If
         Next rollbackIndex
     End If
+    If Not logWs Is Nothing Then logWs.Parent.Save
     On Error GoTo 0
     MsgBox failure & vbCrLf & _
            IIf(Len(problems) > 0, "Проблемы и пропуски:" & vbCrLf & problems & vbCrLf, "") & _
@@ -333,7 +334,9 @@ Public Sub RollbackLastRenameBatch()
                    statusText = "Переименован" Or _
                    Left$(statusText, Len("Файл возвращён; ошибка восстановления ссылки:")) = "Файл возвращён; ошибка восстановления ссылки:" Or _
                    statusText = "Откатан" Or _
-                   statusText = "Автоматически отменён после прерывания" Then
+                   statusText = "Автоматически отменён после прерывания" Or _
+                   Left$(statusText, Len("Ошибка автоматического отката:")) = "Ошибка автоматического отката:" Or _
+                   Left$(statusText, Len("Ошибка отката:")) = "Ошибка отката:" Then
                     sheetName = CStr(logWs.Cells(r, 2).Value)
                     registerRow = CLng(Val(logWs.Cells(r, 3).Value))
                     Set registerWs = Nothing
@@ -435,6 +438,7 @@ Failed:
                       " (" & recoveryError & ")"
         End If
     Next recoveryIndex
+    If Not logWs Is Nothing Then logWs.Parent.Save
     On Error GoTo 0
     MsgBox "Откат прерван. Макрос попытался вернуть уже обработанные файлы к состоянию до отката." & vbCrLf & _
            failure & vbCrLf & "Проверьте журнал переименования и фактические имена файлов.", vbExclamation
