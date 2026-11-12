@@ -14,7 +14,7 @@ Private Const LOG_SHEET As String = "Журнал переименования"
 
 Public Sub RenameFilesFromRegister()
     Dim ws As Worksheet, logWs As Worksheet
-    Dim lastRow As Long, r As Long, logRow As Long
+    Dim lastRow As Long, r As Long, logRow As Long, firstLogRow As Long
     Dim oldPath As String, newPath As String, newName As String, ext As String
     Dim objectName As String, appNo As String, titleText As String
     Dim plan As Collection, rec As Object, seen As Object, seenSource As Object, item As Variant
@@ -132,11 +132,11 @@ ContinueRow:
         logWs.Range("A1:G1").Value = Array("Дата", "Лист перечня", "Строка перечня", "Старый путь", "Новое имя", "Новый путь", "Статус/ошибка")
     End If
     If Len(CStr(logWs.Cells(1, 8).Value)) = 0 Then logWs.Cells(1, 8).Value = "ID пакета"
-    logRow = logWs.Cells(logWs.Rows.Count, 1).End(xlUp).Row + 1
+    firstLogRow = logWs.Cells(logWs.Rows.Count, 1).End(xlUp).Row + 1
+    logRow = firstLogRow
     batchId = Format$(Now, "yyyymmdd_hhnnss") & "_" & Format$(logRow, "000000")
 
     For Each item In plan
-        DoEvents
         logWs.Cells(logRow, 1).Value = Now
         logWs.Cells(logRow, 2).Value = ws.Name
         logWs.Cells(logRow, 3).Value = item("Row")
@@ -145,9 +145,14 @@ ContinueRow:
         logWs.Cells(logRow, 6).Value = item("NewPath")
         logWs.Cells(logRow, 7).Value = "Подготовка"
         logWs.Cells(logRow, 8).Value = batchId
-        logWs.Calculate
-        DoEvents
+        logRow = logRow + 1
+    Next item
 
+    logWs.Parent.Save
+    logRow = firstLogRow
+
+    For Each item In plan
+        DoEvents
         failure = TryRenameFile(CStr(item("OldPath")), CStr(item("NewPath")))
         If Len(failure) = 0 Then
             renamedItems.Add item
@@ -172,6 +177,7 @@ ContinueRow:
             logWs.Cells(logRow, 7).Value = "Ошибка: " & failure
             failed = failed + 1
         End If
+        logWs.Parent.Save
         logRow = logRow + 1
         Application.StatusBar = "Переименование: " & (renamed + failed) & " из " & plan.Count
     Next item
