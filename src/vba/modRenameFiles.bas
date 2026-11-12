@@ -137,19 +137,21 @@ ContinueRow:
 
     For Each item In plan
         DoEvents
-        failure = TryRenameFile(CStr(item("OldPath")), CStr(item("NewPath")))
-        ' Сразу фиксирует изменение файла, прежде чем операции с листом или журналом смогут завершиться ошибкой.
-        If Len(failure) = 0 Then renamedItems.Add item
         logWs.Cells(logRow, 1).Value = Now
         logWs.Cells(logRow, 2).Value = ws.Name
         logWs.Cells(logRow, 3).Value = item("Row")
         logWs.Cells(logRow, 4).Value = item("OldPath")
         logWs.Cells(logRow, 5).Value = item("NewName")
         logWs.Cells(logRow, 6).Value = item("NewPath")
+        logWs.Cells(logRow, 7).Value = "Подготовка"
+        logWs.Cells(logRow, 8).Value = batchId
+        logWs.Calculate
+        DoEvents
+
+        failure = TryRenameFile(CStr(item("OldPath")), CStr(item("NewPath")))
         If Len(failure) = 0 Then
-            ' Одного успешного переименования файла недостаточно: ссылка в перечне тоже должна измениться.
-            ' Если заменить ссылку не удалось, передаёт ошибку общему обработчику, чтобы отменить переименование
-            ' и не оставлять устаревшую или неработающую ссылку.
+            renamedItems.Add item
+            logWs.Cells(logRow, 7).Value = "Файл переименован; обновление ссылки"
             On Error Resume Next
             Err.Clear
             ws.Cells(CLng(item("Row")), COL_LINK).Hyperlinks.Delete
@@ -165,11 +167,9 @@ ContinueRow:
             End If
             On Error GoTo Failed
             logWs.Cells(logRow, 7).Value = "Переименован"
-            logWs.Cells(logRow, 8).Value = batchId
             renamed = renamed + 1
         Else
             logWs.Cells(logRow, 7).Value = "Ошибка: " & failure
-            logWs.Cells(logRow, 8).Value = batchId
             failed = failed + 1
         End If
         logRow = logRow + 1
@@ -322,7 +322,9 @@ Public Sub RollbackLastRenameBatch()
                 skipped = skipped + 1
             ElseIf Len(Dir$(oldPath)) > 0 And Len(Dir$(newPath)) = 0 Then
                 ' Не считает файл откатанным только по расположению: проверяет, что журнал подтверждает исходное переименование.
-                If statusText = "Переименован" Or _
+                If statusText = "Подготовка" Or _
+                   statusText = "Файл переименован; обновление ссылки" Or _
+                   statusText = "Переименован" Or _
                    Left$(statusText, Len("Файл возвращён; ошибка восстановления ссылки:")) = "Файл возвращён; ошибка восстановления ссылки:" Or _
                    statusText = "Откатан" Or _
                    statusText = "Автоматически отменён после прерывания" Then
