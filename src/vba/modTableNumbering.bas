@@ -47,10 +47,17 @@ Public Sub CheckAndNumberWordTables()
     Dim reportCommitted As Boolean, priorRenamed As Boolean
     Dim finalReportCommitted As Boolean, finalOldRenamed As Boolean
 
-    If GetRegisterWorkbook() Is Nothing Then
-        MsgBox "Сначала запустите StartRegisterAutomation, чтобы создать книгу результата.", vbExclamation, "Книга результата не найдена"
+    Dim registerWb As Workbook
+
+    On Error Resume Next
+    Set registerWb = GetRegisterWorkbook()
+    If Err.Number <> 0 Or registerWb Is Nothing Then
+        Err.Clear
+        On Error GoTo 0
+        MsgBox "Откройте книгу с листом «data» и повторите запуск макроса.", vbExclamation, "Книга результата не найдена"
         Exit Sub
     End If
+    On Error GoTo 0
 
     oldScreen = Application.ScreenUpdating
     oldEvents = Application.EnableEvents
