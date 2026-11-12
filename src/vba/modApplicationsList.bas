@@ -438,33 +438,57 @@ Private Sub SaveExistingSections(ByVal ws As Worksheet, ByVal target As Object)
     Dim filePath As String
     Dim sectionValue As String
 
-    On Error GoTo Done
     If ws Is Nothing Then Exit Sub
+    If target Is Nothing Then Exit Sub
+    On Error GoTo ReadFailed
     lastRow = ws.Cells(ws.Rows.Count, 7).End(xlUp).Row
     If lastRow < FIRST_DATA_ROW Then Exit Sub
 
     For r = FIRST_DATA_ROW To lastRow
+        On Error GoTo RowFailed
         filePath = GetCellLinkPath(ws.Cells(r, 7))
         sectionValue = CStr(ws.Cells(r, 8).Value)
-        If Len(filePath) > 0 And Len(sectionValue) > 0 Then target(NormalizeFilePath(filePath)) = sectionValue
+        If Len(filePath) > 0 And Len(sectionValue) > 0 Then
+            target(NormalizeFilePath(filePath)) = sectionValue
+        End If
+NextRow:
+        On Error GoTo 0
     Next r
-Done:
+    Exit Sub
+
+RowFailed:
+    LogLine "Не удалось сохранить значение столбца «Раздел», строка " & r & ": " & Err.Description
+    Err.Clear
+    Resume NextRow
+
+ReadFailed:
+    LogLine "Не удалось прочитать существующие значения столбца «Раздел»: " & Err.Description
+    Err.Clear
 End Sub
 
 Private Function GetCellLinkPath(ByVal c As Range) As String
-    On Error Resume Next
+    On Error GoTo ReadFailed
     If c.Hyperlinks.Count > 0 Then
-        GetCellLinkPath = CStr(c.Hyperlinks(1).Address)
-        If Len(GetCellLinkPath) = 0 Then GetCellLinkPath = CStr(c.Hyperlinks(1).SubAddress)
+        GetCellLinkPath = Trim$(CStr(c.Hyperlinks(1).Address))
     Else
-        GetCellLinkPath = CStr(c.Value)
+        GetCellLinkPath = Trim$(CStr(c.Value))
     End If
-    On Error GoTo 0
+    Exit Function
+
+ReadFailed:
+    GetCellLinkPath = ""
 End Function
 
 Private Function NormalizeFilePath(ByVal value As String) As String
     value = Trim$(value)
-    If LCase$(Left$(value, 8)) = "file:///" Then value = Mid$(value, 9)
+    If LCase$(Left$(value, 7)) = "file://" Then
+        value = Mid$(value, 8)
+        If Left$(value, 1) = "/" Then
+            value = Mid$(value, 2)
+        Else
+            value = "\\" & value
+        End If
+    End If
     value = Replace(value, "%20", " ")
     value = Replace(value, "/", "\")
     NormalizeFilePath = LCase$(value)
