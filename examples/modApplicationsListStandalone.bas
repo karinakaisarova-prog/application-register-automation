@@ -317,7 +317,7 @@ FolderError:
     If InStr(1, currentPath, "http://", vbTextCompare) = 1 Or _
        InStr(1, currentPath, "https://", vbTextCompare) = 1 Then
         LogLine "Подсказка: VBA FileSystemObject не выполняет вход в SharePoint по веб-ссылке. Используйте локальную синхронизированную папку OneDrive либо доступный Windows WebDAV-путь."
-    ElseIf Left$(currentPath, 2) = "\" Then
+    ElseIf Left$(currentPath, 2) = "\\" Then
         LogLine "Подсказка: проверьте доступ к сетевой папке и права чтения."
     Else
         LogLine "Подсказка: проверьте, существует ли папка, синхронизирована ли она с OneDrive и доступны ли файлы локально."
