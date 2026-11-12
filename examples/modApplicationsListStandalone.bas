@@ -62,15 +62,33 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
     mFolderErrorCount = 0
 
     Set roots = New Collection
-    Set dlg = Application.FileDialog(msoFileDialogFolderPicker)
-    With dlg
-        .Title = "Выберите одну или несколько исходных папок"
-        .AllowMultiSelect = True
-        If .Show <> -1 Then GoTo CleanExit
-        For Each rootItem In .SelectedItems
-            roots.Add NormalizeSelectedRootPath(CStr(rootItem))
-        Next rootItem
-    End With
+    If MsgBox("Выберите способ указания исходной папки:" & vbCrLf & vbCrLf & _
+              "Да — выбрать одну или несколько папок через Проводник Windows." & vbCrLf & _
+              "Нет — вставить веб-адрес папки SharePoint." & vbCrLf & _
+              "Отмена — выйти без изменений.", _
+              vbYesNoCancel + vbQuestion + vbDefaultButton1, "Выбор исходной папки") = vbYes Then
+        Set dlg = Application.FileDialog(msoFileDialogFolderPicker)
+        With dlg
+            .Title = "Выберите одну или несколько исходных папок"
+            .AllowMultiSelect = True
+            If .Show <> -1 Then GoTo CleanExit
+            For Each rootItem In .SelectedItems
+                roots.Add NormalizeSelectedRootPath(CStr(rootItem))
+            Next rootItem
+        End With
+    ElseIf MsgBox("Вставить веб-адрес SharePoint?", vbYesNo + vbQuestion, "SharePoint") = vbYes Then
+        Dim sharePointUrl As String
+        sharePointUrl = Trim$(InputBox("Вставьте полный адрес папки SharePoint, начиная с http:// или https://", _
+                                       "Адрес папки SharePoint"))
+        If Len(sharePointUrl) = 0 Then GoTo CleanExit
+        If InStr(1, sharePointUrl, "://", vbTextCompare) = 0 Then
+            MsgBox "Укажите полный веб-адрес, начинающийся с http:// или https://.", vbExclamation, "Неверный адрес"
+            GoTo CleanExit
+        End If
+        roots.Add NormalizeSelectedRootPath(sharePointUrl)
+    Else
+        GoTo CleanExit
+    End If
 
     sheetName = SafeSheetName(GetFolderName(CStr(roots(1))))
     If LCase$(sheetName) = LCase$(DATA_SHEET_NAME) Then sheetName = "Перечень приложений"
