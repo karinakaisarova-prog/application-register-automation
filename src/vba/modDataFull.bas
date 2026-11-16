@@ -85,6 +85,7 @@ Public Sub BuildDataFull()
         outputWs.Copy After:=GetRegisterWorkbook().Worksheets(GetRegisterWorkbook().Worksheets.Count)
         Set backupWs = ActiveSheet
         backupWs.Name = GetUniqueDataFullBackupName()
+        GetRegisterWorkbook().Save
     Else
         Set outputWs = GetOrCreateDataFullSheet()
     End If
