@@ -402,6 +402,27 @@ if context_module.exists():
         if fragment not in context_source:
             errors.append(f'modWorkbookContext.bas: single-workbook startup guard missing: {fragment}')
 
+# Лист data_full нельзя очищать до сохранения резервной копии,
+# а при отсутствии заполненных пар прежний результат должен оставаться нетронутым.
+data_full_module = root / 'src' / 'vba' / 'modDataFull.bas'
+if data_full_module.exists():
+    data_full_source = data_full_module.read_text(encoding='utf-8-sig')
+    data_full_guards = (
+        'If pairs.Count = 0 Then',
+        'Лист data_full не изменён.',
+        'backupWs.Name = GetUniqueDataFullBackupName()',
+        'GetRegisterWorkbook().Save',
+        'outputWs.Cells.Clear',
+        'If Not backupWs Is Nothing Then',
+    )
+    for fragment in data_full_guards:
+        if fragment not in data_full_source:
+            errors.append('modDataFull.bas: safe rebuild guard missing: ' + fragment)
+    backup_pos = data_full_source.find('GetRegisterWorkbook().Save')
+    clear_pos = data_full_source.find('outputWs.Cells.Clear')
+    if backup_pos < 0 or clear_pos < 0 or backup_pos > clear_pos:
+        errors.append('modDataFull.bas: backup must be saved before clearing the existing data_full sheet')
+
 # Точки запуска должны быть доступными извне макросами, а не только закрытыми
 # процедурами или функциями с такими же именами.
 required_public_subs = {
