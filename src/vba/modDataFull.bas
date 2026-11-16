@@ -75,6 +75,11 @@ Public Sub BuildDataFull()
         Application.StatusBar = "Формирование data_full: строка " & r & " из " & lastRow
     Next r
 
+    If pairs.Count = 0 Then
+        MsgBox "Нет строк, где одновременно заполнены «Раздел» и «Ответственное лицо». Лист data_full не изменён.", vbInformation
+        GoTo CleanExit
+    End If
+
     On Error Resume Next
     Set outputWs = GetRegisterWorkbook().Worksheets(OUTPUT_SHEET)
     On Error GoTo Failed
