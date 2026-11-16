@@ -270,3 +270,8 @@ Private Function GetUniqueDataFullBackupName() As String
     Loop
     GetUniqueDataFullBackupName = candidate
 End Function
+
+Private Sub LogLine(ByVal message As String)
+    Application.StatusBar = message
+    DoEvents
+End Sub
