@@ -66,11 +66,16 @@ Public Sub BuildDataFull()
 
     For r = SOURCE_FIRST_ROW To lastRow
         DoEvents
-        sectionText = Trim$(CStr(sourceWs.Cells(r, COL_SECTION).Value))
-        personText = Trim$(CStr(sourceWs.Cells(r, COL_RESPONSIBLE).Value))
-        If Len(sectionText) > 0 And Len(personText) > 0 Then
-            key = sectionText & Chr$(30) & personText
-            If Not pairs.Exists(key) Then pairs.Add key, Array(sectionText, personText)
+        If IsError(sourceWs.Cells(r, COL_SECTION).Value) Or _
+           IsError(sourceWs.Cells(r, COL_RESPONSIBLE).Value) Then
+            LogLine "Пропущена строка " & r & ": в столбце «Раздел» или «Ответственное лицо» содержится ошибка Excel."
+        Else
+            sectionText = Trim$(CStr(sourceWs.Cells(r, COL_SECTION).Value))
+            personText = Trim$(CStr(sourceWs.Cells(r, COL_RESPONSIBLE).Value))
+            If Len(sectionText) > 0 And Len(personText) > 0 Then
+                key = sectionText & Chr$(30) & personText
+                If Not pairs.Exists(key) Then pairs.Add key, Array(sectionText, personText)
+            End If
         End If
         Application.StatusBar = "Формирование data_full: строка " & r & " из " & lastRow
     Next r
