@@ -408,6 +408,8 @@ data_full_module = root / 'src' / 'vba' / 'modDataFull.bas'
 if data_full_module.exists():
     data_full_source = data_full_module.read_text(encoding='utf-8-sig')
     data_full_guards = (
+        'If IsError(sourceWs.Cells(r, COL_SECTION).Value) Or _',
+        'LogLine "Пропущена строка " & r',
         'If pairs.Count = 0 Then',
         'Лист data_full не изменён.',
         'backupWs.Name = GetUniqueDataFullBackupName()',
