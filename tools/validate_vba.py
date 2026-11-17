@@ -262,7 +262,8 @@ for module_name, logger in (
     ('modApplicationsList.bas', 'LogApplicationsListLine'),
     ('modApplicationsListStandalone.bas', 'LogLine'),
 ):
-    module_path = root / ('src' / 'vba' if module_name == 'modApplicationsList.bas' else 'examples') / module_name
+    module_directory = root / 'src' / 'vba' if module_name == 'modApplicationsList.bas' else root / 'examples'
+    module_path = module_directory / module_name
     if module_path.exists():
         module_source = module_path.read_text(encoding='utf-8-sig')
         for fragment in (
