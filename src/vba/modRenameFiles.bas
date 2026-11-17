@@ -27,6 +27,8 @@ Public Sub RenameFilesFromRegister()
     Dim rollbackItem As Variant
     Dim rollbackIndex As Long
     Dim rollbackError As String
+    Dim renameInProgress As Boolean
+    Dim currentRenameItem As Object
 
     oldScreen = Application.ScreenUpdating
     oldEvents = Application.EnableEvents
@@ -153,9 +155,12 @@ ContinueRow:
 
     For Each item In plan
         DoEvents
+        Set currentRenameItem = item
+        renameInProgress = True
         failure = TryRenameFile(CStr(item("OldPath")), CStr(item("NewPath")))
         If Len(failure) = 0 Then
             renamedItems.Add item
+            renameInProgress = False
             logWs.Cells(logRow, 7).Value = "Файл переименован; обновление ссылки"
             On Error Resume Next
             Err.Clear
@@ -179,6 +184,7 @@ ContinueRow:
             logWs.Cells(logRow, 7).Value = "Переименован"
             renamed = renamed + 1
         Else
+            renameInProgress = False
             logWs.Cells(logRow, 7).Value = "Ошибка: " & failure
             failed = failed + 1
         End If
@@ -200,6 +206,12 @@ Failed:
     ' может помешать завершить откат.
     On Error Resume Next
     Application.EnableCancelKey = xlDisabled
+    If renameInProgress And Not currentRenameItem Is Nothing Then
+        If Len(Dir$(CStr(currentRenameItem("NewPath")))) > 0 And _
+           Len(Dir$(CStr(currentRenameItem("OldPath")))) = 0 Then
+            renamedItems.Add currentRenameItem
+        End If
+    End If
     If Not renamedItems Is Nothing Then
         ' Отменяет изменения в обратном порядке.
         For rollbackIndex = renamedItems.Count To 1 Step -1
@@ -268,6 +280,8 @@ Public Sub RollbackLastRenameBatch()
     Dim failure As String, recoveryError As String, itemPath As Variant
     Dim candidateOldPath As String, candidateNewPath As String
     Dim recoveryIndex As Long
+    Dim rollbackInProgress As Boolean
+    Dim activeRollbackItem As Object
 
     oldScreen = Application.ScreenUpdating
     oldEvents = Application.EnableEvents
@@ -388,16 +402,19 @@ Public Sub RollbackLastRenameBatch()
                 logWs.Cells(r, 7).Value = "Откат пропущен: конфликт путей (проверьте оба имени)"
                 skipped = skipped + 1
             Else
+                Set activeRollbackItem = CreateObject("Scripting.Dictionary")
+                activeRollbackItem("LogRow") = r
+                activeRollbackItem("OldPath") = oldPath
+                activeRollbackItem("NewPath") = newPath
+                activeRollbackItem("SheetName") = CStr(logWs.Cells(r, 2).Value)
+                activeRollbackItem("RegisterRow") = CLng(Val(logWs.Cells(r, 3).Value))
+                rollbackInProgress = True
                 errText = TryRenameFile(newPath, oldPath)
                 If Len(errText) = 0 Then
                     ' Фиксирует изменение сразу после операции с файлом, чтобы восстановление после прерывания могло его обнаружить.
-                    Set doneItem = CreateObject("Scripting.Dictionary")
-                    doneItem("LogRow") = r
-                    doneItem("OldPath") = oldPath
-                    doneItem("NewPath") = newPath
-                    doneItem("SheetName") = CStr(logWs.Cells(r, 2).Value)
-                    doneItem("RegisterRow") = CLng(Val(logWs.Cells(r, 3).Value))
+                    Set doneItem = activeRollbackItem
                     reversedItems.Add doneItem
+                    rollbackInProgress = False
 
                     logWs.Cells(r, 7).Value = "Откатан"
                     sheetName = CStr(doneItem("SheetName"))
@@ -420,6 +437,7 @@ Public Sub RollbackLastRenameBatch()
                     End If
                     restored = restored + 1
                 Else
+                    rollbackInProgress = False
                     logWs.Cells(r, 7).Value = "Ошибка отката: " & errText
                     skipped = skipped + 1
                 End If
@@ -436,6 +454,12 @@ Failed:
     ' Пытается вернуть файлы, уже переименованные в этом запуске, к состоянию после переименования.
     On Error Resume Next
     Application.EnableCancelKey = xlDisabled
+    If rollbackInProgress And Not activeRollbackItem Is Nothing Then
+        If Len(Dir$(CStr(activeRollbackItem("OldPath")))) > 0 And _
+           Len(Dir$(CStr(activeRollbackItem("NewPath")))) = 0 Then
+            reversedItems.Add activeRollbackItem
+        End If
+    End If
     ' Отменяет действия отката в обратном порядке, чтобы вернуть состояние до начала отката.
     For recoveryIndex = reversedItems.Count To 1 Step -1
         Set item = reversedItems(recoveryIndex)
