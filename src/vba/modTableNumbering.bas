@@ -525,10 +525,16 @@ Private Function GetPreviousCaptionText(ByVal wdDoc As Object, ByVal tableStart 
 End Function
 
 Private Function IsTableCaptionText(ByVal captionText As String) As Boolean
+    Dim rx As Object
     captionText = Replace(captionText, ChrW(160), " ")
     captionText = Trim$(captionText)
-    If Len(captionText) < Len("Таблица") Then Exit Function
-    IsTableCaptionText = (StrComp(Left$(captionText, Len("Таблица")), "Таблица", vbTextCompare) = 0)
+    If Len(captionText) = 0 Then Exit Function
+
+    Set rx = CreateObject("VBScript.RegExp")
+    rx.Global = False
+    rx.IgnoreCase = True
+    rx.Pattern = "^Таблица\s*(№|N|#)?\s*[0-9]+[А-ЯA-Z]?(\s|[.,:;–—-]|$)"
+    IsTableCaptionText = rx.Test(captionText)
 End Function
 
 Private Sub EnsureTableCaptionLabel(ByVal wdDoc As Object)
@@ -545,15 +551,14 @@ End Sub
 Private Sub UpdateAllStoryFields(ByVal wdDoc As Object)
     Dim story As Object
     Dim currentRange As Object
-    On Error Resume Next
+
     For Each story In wdDoc.StoryRanges
         Set currentRange = story
-        Do
+        Do While Not currentRange Is Nothing
             currentRange.Fields.Update
             Set currentRange = currentRange.NextStoryRange
-        Loop Until currentRange Is Nothing
+        Loop
     Next story
-    On Error GoTo 0
 End Sub
 
 Private Function GetUniqueTableAuditSheetName(ByVal baseName As String) As String
