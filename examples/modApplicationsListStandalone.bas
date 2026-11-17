@@ -864,7 +864,7 @@ Private Function NormalizeSelectedRootPath(ByVal selectedPath As String) As Stri
     If InStr(urlPath, "?") > 0 Then urlPath = Left$(urlPath, InStr(urlPath, "?") - 1)
     If InStr(urlPath, "#") > 0 Then urlPath = Left$(urlPath, InStr(urlPath, "#") - 1)
     urlPath = DecodeUrlPath(urlPath)
-    urlPath = Replace(urlPath, "/", "\\")
+    urlPath = Replace(urlPath, "/", "\")
 
     serverName = authority
     portText = ""
@@ -887,8 +887,8 @@ Private Function NormalizeSelectedRootPath(ByVal selectedPath As String) As Stri
         If Len(portText) > 0 And portText <> "80" Then webDavServer = webDavServer & "@" & portText
     End If
 
-    NormalizeSelectedRootPath = "\\\\" & webDavServer & "\\DavWWWRoot"
-    If Len(urlPath) > 0 Then NormalizeSelectedRootPath = NormalizeSelectedRootPath & "\\" & urlPath
+    NormalizeSelectedRootPath = "\\" & webDavServer & "\DavWWWRoot"
+    If Len(urlPath) > 0 Then NormalizeSelectedRootPath = NormalizeSelectedRootPath & "\" & urlPath
 
     LogLine "Адрес SharePoint преобразован в путь Windows WebDAV: " & NormalizeSelectedRootPath
 End Function
