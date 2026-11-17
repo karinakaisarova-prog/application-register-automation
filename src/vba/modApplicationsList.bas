@@ -110,7 +110,7 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
         ws.Copy After:=GetRegisterWorkbook().Worksheets(GetRegisterWorkbook().Worksheets.Count)
         Set backupWs = GetRegisterWorkbook().Worksheets(GetRegisterWorkbook().Worksheets.Count)
         backupWs.Name = backupSheetName
-        LogLine "Создана временная резервная копия листа: " & originalSheetName
+        LogApplicationsListLine "Создана временная резервная копия листа: " & originalSheetName
     End If
 
     Set mFiles = New Collection
@@ -118,7 +118,7 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
     mSeenPaths.CompareMode = vbTextCompare
     For Each rootItem In roots
         mRootPath = CStr(rootItem)
-        LogLine "Поиск файлов: " & mRootPath
+        LogApplicationsListLine "Поиск файлов: " & mRootPath
         CollectFiles mRootPath, mRootPath, 0
     Next rootItem
 
@@ -129,7 +129,7 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
                   "а не веб-адрес в браузере." & vbCrLf & vbCrLf & _
                   "Продолжить с найденными файлами?", _
                   vbYesNo + vbExclamation + vbDefaultButton2, "Обнаружены недоступные папки") <> vbYes Then
-            LogLine "Построение остановлено: пользователь не подтвердил создание неполного перечня."
+            LogApplicationsListLine "Построение остановлено: пользователь не подтвердил создание неполного перечня."
             GoTo CleanExit
         End If
     End If
@@ -138,7 +138,7 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
         If Not backupWs Is Nothing Then
             backupWs.Delete
             Set backupWs = Nothing
-            LogLine "Файлы не найдены; исходный лист оставлен без изменений, временная копия удалена."
+            LogApplicationsListLine "Файлы не найдены; исходный лист оставлен без изменений, временная копия удалена."
         End If
         MsgBox "Подходящие файлы не найдены." & vbCrLf & mLogText, vbInformation, "Перечень приложений"
         GoTo CleanExit
@@ -156,7 +156,7 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
         Application.DisplayAlerts = False
         backupWs.Delete
         Set backupWs = Nothing
-        LogLine "Временная резервная копия удалена после успешного формирования."
+        LogApplicationsListLine "Временная резервная копия удалена после успешного формирования."
     End If
     Application.StatusBar = False
     MsgBox "Перечень сформирован. Найдено файлов: " & mFiles.Count & vbCrLf & vbCrLf & mLogText, _
@@ -167,9 +167,9 @@ Failed:
     cancelOrError = (Err.Number = 18)
     errText = Err.Description
     If cancelOrError Then
-        LogLine "Операция отменена пользователем."
+        LogApplicationsListLine "Операция отменена пользователем."
     Else
-        LogLine "Ошибка " & Err.Number & ": " & errText
+        LogApplicationsListLine "Ошибка " & Err.Number & ": " & errText
     End If
     On Error Resume Next
     If Not backupWs Is Nothing Then
@@ -178,7 +178,7 @@ Failed:
             ' Исходный лист не менялся; удаляем только неиспользованную копию.
             backupWs.Delete
             Set backupWs = Nothing
-            LogLine "Формирование не началось; исходный лист оставлен без изменений."
+            LogApplicationsListLine "Формирование не началось; исходный лист оставлен без изменений."
         Else
             ' Не удаляем повреждённый лист, пока резервная копия не получит его имя.
             ' Если переименование не удалось, сохраняем копию для восстановления.
@@ -190,9 +190,9 @@ Failed:
                 If Err.Number = 0 Then
                     Set ws = backupWs
                     Set backupWs = Nothing
-                    LogLine "Исходный лист восстановлен из резервной копии."
+                    LogApplicationsListLine "Исходный лист восстановлен из резервной копии."
                 Else
-                    LogLine "Не удалось восстановить исходное имя листа. Резервная копия сохранена: " & backupWs.Name
+                    LogApplicationsListLine "Не удалось восстановить исходное имя листа. Резервная копия сохранена: " & backupWs.Name
                 End If
             Else
                 recoverySheetName = GetUniqueRecoverySheetName()
@@ -207,17 +207,17 @@ Failed:
                         Err.Clear
                         damagedWs.Delete
                         If Err.Number = 0 Then
-                            LogLine "Исходный лист восстановлен из резервной копии."
+                            LogApplicationsListLine "Исходный лист восстановлен из резервной копии."
                         Else
-                            LogLine "Лист восстановлен. Повреждённый лист сохранён под именем: " & recoverySheetName
+                            LogApplicationsListLine "Лист восстановлен. Повреждённый лист сохранён под именем: " & recoverySheetName
                         End If
                     Else
                         Err.Clear
                         damagedWs.Name = originalSheetName
-                        LogLine "Не удалось переименовать резервную копию в исходное имя. Резервная копия сохранена: " & backupWs.Name
+                        LogApplicationsListLine "Не удалось переименовать резервную копию в исходное имя. Резервная копия сохранена: " & backupWs.Name
                     End If
                 Else
-                    LogLine "Не удалось безопасно переименовать исходный лист. Резервная копия сохранена: " & backupWs.Name
+                    LogApplicationsListLine "Не удалось безопасно переименовать исходный лист. Резервная копия сохранена: " & backupWs.Name
                 End If
             End If
         End If
@@ -225,7 +225,7 @@ Failed:
         Set ws = Nothing
         Set ws = GetRegisterWorkbook().Worksheets(sheetName)
         If Not ws Is Nothing Then ws.Delete
-        LogLine "Новый неполный лист удалён."
+        LogApplicationsListLine "Новый неполный лист удалён."
     End If
     Application.StatusBar = False
     MsgBox IIf(cancelOrError, "Операция отменена.", "Не удалось завершить формирование перечня: " & errText) & _
@@ -236,7 +236,7 @@ CleanExit:
     If Not backupWs Is Nothing Then
         ' После неудачного восстановления резервная копия может быть единственной
         ' доступной для восстановления. Не удаляем её из-за очищенного кода ошибки.
-        LogLine "Резервная копия сохранена для проверки: " & backupWs.Name
+        LogApplicationsListLine "Резервная копия сохранена для проверки: " & backupWs.Name
     End If
     Application.ScreenUpdating = oldScreenUpdating
     Application.EnableEvents = oldEnableEvents
@@ -304,7 +304,7 @@ Private Sub CollectFiles(ByVal rootPath As String, ByVal currentPath As String, 
                 rec("Folder") = CStr(currentPath)
                 mFiles.Add rec
             Else
-                LogLine "Повторный путь пропущен: " & CStr(fileItem.Path)
+                LogApplicationsListLine "Повторный путь пропущен: " & CStr(fileItem.Path)
             End If
         End If
     Next fileItem
@@ -324,14 +324,14 @@ FolderError:
         Err.Raise 18
     End If
     mFolderErrorCount = mFolderErrorCount + 1
-    LogLine "ОШИБКА ЧТЕНИЯ ПАПКИ: " & currentPath & " (ошибка " & Err.Number & ": " & Err.Description & ")"
+    LogApplicationsListLine "ОШИБКА ЧТЕНИЯ ПАПКИ: " & currentPath & " (ошибка " & Err.Number & ": " & Err.Description & ")"
     If InStr(1, currentPath, "http://", vbTextCompare) = 1 Or _
        InStr(1, currentPath, "https://", vbTextCompare) = 1 Then
-        LogLine "Подсказка: VBA FileSystemObject не выполняет вход в SharePoint по веб-ссылке. Используйте локальную синхронизированную папку OneDrive либо доступный Windows WebDAV-путь."
+        LogApplicationsListLine "Подсказка: VBA FileSystemObject не выполняет вход в SharePoint по веб-ссылке. Используйте локальную синхронизированную папку OneDrive либо доступный Windows WebDAV-путь."
     ElseIf Left$(currentPath, 2) = "\\" Then
-        LogLine "Подсказка: проверьте доступ к сетевой папке и права чтения."
+        LogApplicationsListLine "Подсказка: проверьте доступ к сетевой папке и права чтения."
     Else
-        LogLine "Подсказка: проверьте, существует ли папка, синхронизирована ли она с OneDrive и доступны ли файлы локально."
+        LogApplicationsListLine "Подсказка: проверьте, существует ли папка, синхронизирована ли она с OneDrive и доступны ли файлы локально."
     End If
     Err.Clear
 End Sub
@@ -474,12 +474,12 @@ NextRow:
     Exit Sub
 
 RowFailed:
-    LogLine "Не удалось сохранить значение столбца «Раздел», строка " & r & ": " & Err.Description
+    LogApplicationsListLine "Не удалось сохранить значение столбца «Раздел», строка " & r & ": " & Err.Description
     Err.Clear
     Resume NextRow
 
 ReadFailed:
-    LogLine "Не удалось прочитать существующие значения столбца «Раздел»: " & Err.Description
+    LogApplicationsListLine "Не удалось прочитать существующие значения столбца «Раздел»: " & Err.Description
     Err.Clear
 End Sub
 
@@ -626,7 +626,7 @@ Private Sub CheckDuplicateApplicationNumbers(ByVal ws As Worksheet)
                     ws.Cells(r, 3).Interior.Color = RGB(255, 199, 206)
                     ws.Cells(r, 2).Font.Color = RGB(156, 0, 6)
                     ws.Cells(r, 3).Font.Color = RGB(156, 0, 6)
-                    LogLine "Повтор номера приложения № " & appNumber & _
+                    LogApplicationsListLine "Повтор номера приложения № " & appNumber & _
                             " у объекта '" & objectName & "' (строка " & r & ")."
                     duplicateCount = duplicateCount + 1
                 End If
@@ -635,9 +635,9 @@ Private Sub CheckDuplicateApplicationNumbers(ByVal ws As Worksheet)
     Next r
 
     If duplicateCount = 0 Then
-        LogLine "Повторов номеров приложений внутри объектов не обнаружено."
+        LogApplicationsListLine "Повторов номеров приложений внутри объектов не обнаружено."
     Else
-        LogLine "Проверка нумерации: отмечено строк с повторяющимися номерами: " & duplicateCount & "."
+        LogApplicationsListLine "Проверка нумерации: отмечено строк с повторяющимися номерами: " & duplicateCount & "."
     End If
 End Sub
 
@@ -661,7 +661,7 @@ Private Sub ApplyLookups(ByVal ws As Worksheet)
     Dim appName As String
 
     If Not WorksheetExists(DATA_SHEET_NAME) Then
-        LogLine "Предупреждение: лист 'data' не найден; столбцы 'Отдел' и 'Ответственное лицо' не заполнены автоматически."
+        LogApplicationsListLine "Предупреждение: лист 'data' не найден; столбцы 'Отдел' и 'Ответственное лицо' не заполнены автоматически."
         Exit Sub
     End If
 
@@ -831,7 +831,7 @@ Private Function NormalizeSelectedRootPath(ByVal selectedPath As String) As Stri
     NormalizeSelectedRootPath = "\\" & webDavServer & "\DavWWWRoot"
     If Len(urlPath) > 0 Then NormalizeSelectedRootPath = NormalizeSelectedRootPath & "\" & urlPath
 
-    LogLine "Адрес SharePoint преобразован в путь Windows WebDAV: " & NormalizeSelectedRootPath
+    LogApplicationsListLine "Адрес SharePoint преобразован в путь Windows WebDAV: " & NormalizeSelectedRootPath
 End Function
 
 Private Function GetFolderName(ByVal folderPath As String) As String
@@ -865,7 +865,7 @@ Private Function RemoveTrailingSlash(ByVal value As String) As String
     RemoveTrailingSlash = value
 End Function
 
-Private Sub LogLine(ByVal message As String)
+Private Sub LogApplicationsListLine(ByVal message As String)
     mLogText = mLogText & Format$(Now, "hh:nn:ss") & "  " & message & vbCrLf
     Application.StatusBar = message
     DoEvents
