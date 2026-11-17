@@ -252,6 +252,9 @@ CleanExit:
 End Sub
 
 Private Sub TryCreateRegisterControlPanel(ByVal ws As Worksheet)
+    Dim failureNumber As Long
+    Dim failureDescription As String
+
     On Error GoTo PanelFailed
     CreateRegisterControlPanel ws
     Exit Sub
@@ -261,7 +264,10 @@ PanelFailed:
         On Error GoTo 0
         Err.Raise 18
     End If
-    LogApplicationsListLine "Не удалось создать панель кнопок: " & Err.Description
+
+    failureNumber = Err.Number
+    failureDescription = Err.Description
+    LogApplicationsListLine "Не удалось создать панель кнопок. Ошибка " & failureNumber & ": " & failureDescription
     Err.Clear
 End Sub
 
