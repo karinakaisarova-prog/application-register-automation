@@ -67,7 +67,6 @@ Public Sub CreateRegisterControlPanel(ByVal ws As Worksheet)
     Dim shp As Shape
     Dim leftPos As Double
     Dim topPos As Double
-    Dim actionName As String
     Dim workbookRef As String
     Dim batchPrefix As String
     Dim replacementStarted As Boolean
