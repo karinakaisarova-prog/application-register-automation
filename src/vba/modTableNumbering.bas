@@ -575,13 +575,20 @@ End Sub
 
 Private Sub EnsureTableCaptionLabel(ByVal wdDoc As Object)
     Dim label As Object
+    Dim savedErrNumber As Long
+    Dim savedErrDescription As String
+
     On Error Resume Next
+    Err.Clear
     Set label = wdDoc.CaptionLabels("Таблица")
-    If label Is Nothing Then
-        Err.Clear
-        wdDoc.CaptionLabels.Add "Таблица"
-    End If
+    savedErrNumber = Err.Number
+    savedErrDescription = Err.Description
     On Error GoTo 0
+
+    If savedErrNumber = 18 Or (savedErrNumber <> 0 And savedErrNumber <> 5941) Then
+        Err.Raise savedErrNumber, "EnsureTableCaptionLabel", savedErrDescription
+    End If
+    If label Is Nothing Then wdDoc.CaptionLabels.Add "Таблица"
 End Sub
 
 Private Sub UpdateAllStoryFields(ByVal wdDoc As Object)
