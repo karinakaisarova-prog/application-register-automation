@@ -264,7 +264,8 @@ if sharepoint_doc.exists():
     doc_text = sharepoint_doc.read_text(encoding='utf-8-sig')
     for fragment in (
         'http://stksps01:55555/SD/',
-        '\\\\\\\\stksps01@55555\\\\DavWWWRoot',
+        'stksps01@55555',
+        'DavWWWRoot',
         'синхронизированной папки',
         'WebClient',
     ):
