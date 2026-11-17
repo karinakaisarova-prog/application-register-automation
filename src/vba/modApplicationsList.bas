@@ -474,11 +474,19 @@ NextRow:
     Exit Sub
 
 RowFailed:
+    If Err.Number = 18 Then
+        On Error GoTo 0
+        Err.Raise 18
+    End If
     LogApplicationsListLine "Не удалось сохранить значение столбца «Раздел», строка " & r & ": " & Err.Description
     Err.Clear
     Resume NextRow
 
 ReadFailed:
+    If Err.Number = 18 Then
+        On Error GoTo 0
+        Err.Raise 18
+    End If
     LogApplicationsListLine "Не удалось прочитать существующие значения столбца «Раздел»: " & Err.Description
     Err.Clear
 End Sub
@@ -493,6 +501,10 @@ Private Function GetCellLinkPath(ByVal c As Range) As String
     Exit Function
 
 ReadFailed:
+    If Err.Number = 18 Then
+        On Error GoTo 0
+        Err.Raise 18
+    End If
     GetCellLinkPath = ""
 End Function
 
@@ -518,14 +530,18 @@ Private Sub BuildOutputSheet(ByVal ws As Worksheet, ByVal files As Collection, B
     Dim rec As Object
     Dim sectionValue As String
     Dim sortKey As String
+    Dim hyperlinkDeleteError As Long
 
     headers = Array("№ п/п", "Объект", "№ Прил.", "Наименование", "Отдел", _
                     "Ответственное лицо", "Ссылка на файл", "Раздел", "Стр. отчёта", "Кол-во страниц")
 
     ws.Cells.Clear
     On Error Resume Next
+    Err.Clear
     ws.Hyperlinks.Delete
+    hyperlinkDeleteError = Err.Number
     On Error GoTo 0
+    If hyperlinkDeleteError = 18 Then Err.Raise 18
 
     With ws.Range("A1:J1")
         .Merge
@@ -733,9 +749,13 @@ End Sub
 
 Private Function GetOrCreateSheet(ByVal sheetName As String) As Worksheet
     Dim ws As Worksheet
+    Dim lookupError As Long
     On Error Resume Next
+    Err.Clear
     Set ws = GetRegisterWorkbook().Worksheets(sheetName)
+    lookupError = Err.Number
     On Error GoTo 0
+    If lookupError = 18 Then Err.Raise 18
     If ws Is Nothing Then
         Set ws = GetRegisterWorkbook().Worksheets.Add(After:=GetRegisterWorkbook().Worksheets(GetRegisterWorkbook().Worksheets.Count))
         ws.Name = sheetName
@@ -745,10 +765,14 @@ End Function
 
 Private Function WorksheetExists(ByVal sheetName As String) As Boolean
     Dim ws As Worksheet
+    Dim lookupError As Long
     On Error Resume Next
+    Err.Clear
     Set ws = GetRegisterWorkbook().Worksheets(sheetName)
-    WorksheetExists = Not ws Is Nothing
+    lookupError = Err.Number
     On Error GoTo 0
+    If lookupError = 18 Then Err.Raise 18
+    WorksheetExists = Not ws Is Nothing
 End Function
 
 Private Function SafeSheetName(ByVal value As String) As String
@@ -838,12 +862,21 @@ Private Function GetFolderName(ByVal folderPath As String) As String
     Dim fso As Object
     Dim normalizedPath As String
     Dim separatorPos As Long
+    Dim accessError As Long
 
     normalizedPath = RemoveTrailingSlash(Trim$(folderPath))
     On Error Resume Next
+    Err.Clear
     Set fso = CreateObject("Scripting.FileSystemObject")
-    If Not fso Is Nothing Then GetFolderName = fso.GetFolder(normalizedPath).Name
+    accessError = Err.Number
+    If accessError = 0 Then
+        If Not fso Is Nothing Then
+            GetFolderName = fso.GetFolder(normalizedPath).Name
+            accessError = Err.Number
+        End If
+    End If
     On Error GoTo 0
+    If accessError = 18 Then Err.Raise 18
 
     ' Сетевой путь WebDAV может быть недоступен уже при определении имени листа.
     ' Используем последний фрагмент пути, чтобы дальнейшая проверка записала реальную ошибку доступа.
