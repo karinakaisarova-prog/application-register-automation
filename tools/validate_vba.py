@@ -257,6 +257,24 @@ if list_module.exists():
         if fragment not in sharepoint_source:
             errors.append('modApplicationsList.bas: SharePoint path handling missing or malformed: ' + fragment)
 
+# При ошибке чтения WebDAV должен выводиться отдельный совет по службе WebClient и авторизации.
+for module_name, logger in (
+    ('modApplicationsList.bas', 'LogApplicationsListLine'),
+    ('modApplicationsListStandalone.bas', 'LogLine'),
+):
+    module_path = root / ('src' / 'vba' if module_name == 'modApplicationsList.bas' else 'examples') / module_name
+    if module_path.exists():
+        module_source = module_path.read_text(encoding='utf-8-sig')
+        for fragment in (
+            'Private mCurrentRootIsWebDav As Boolean',
+            'mCurrentRootIsWebDav = (InStr(1, mRootPath, "\\\\DavWWWRoot", vbTextCompare) > 0)',
+            'If mCurrentRootIsWebDav Then',
+            'службу WebClient Windows',
+            'синхронизированную папку SharePoint',
+        ):
+            if fragment not in module_source:
+                errors.append(module_name + ': WebDAV access diagnostic missing: ' + fragment)
+
 # Проверяет, что инструкции различают WebDAV и локальную синхронизацию SharePoint.
 sharepoint_doc = root / 'docs' / 'sharepoint-troubleshooting.md'
 sharepoint_tests = root / 'tests' / 'test-checklist.md'
