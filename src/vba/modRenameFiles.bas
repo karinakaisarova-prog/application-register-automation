@@ -309,7 +309,11 @@ Public Sub RollbackLastRenameBatch()
                 Exit For
             ElseIf Len(Dir$(candidateOldPath)) > 0 And Len(Dir$(candidateNewPath)) = 0 Then
                 If Left$(statusText, Len("Файл возвращён; ошибка восстановления ссылки:")) = "Файл возвращён; ошибка восстановления ссылки:" Or _
-                   Left$(statusText, Len("Ошибка восстановления после прерывания:")) = "Ошибка восстановления после прерывания:" Then
+                   Left$(statusText, Len("Ошибка восстановления после прерывания:")) = "Ошибка восстановления после прерывания:" Or _
+                   statusText = "Ошибка отката" Or _
+                   Left$(statusText, Len("Ошибка отката:")) = "Ошибка отката:" Or _
+                   statusText = "Откат пропущен" Or _
+                   Left$(statusText, Len("Откат пропущен:")) = "Откат пропущен:" Then
                     batchId = Trim$(CStr(logWs.Cells(r, 8).Value))
                     Exit For
                 End If
