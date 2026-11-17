@@ -397,7 +397,6 @@ if context_module.exists():
     context_source = context_module.read_text(encoding='utf-8-sig')
     startup_guards = (
         'Set sourceWb = ThisWorkbook',
-        'Set sourceData = sourceWb.Worksheets("data")',
         'Set gRegisterWorkbook = sourceWb',
         'CreateMultiFolderApplicationsListCorrected',
         'failureNumber = Err.Number',
@@ -406,6 +405,17 @@ if context_module.exists():
     for fragment in startup_guards:
         if fragment not in context_source:
             errors.append(f'modWorkbookContext.bas: single-workbook startup guard missing: {fragment}')
+    if not (
+        'Set sourceData = sourceWb.Worksheets("data")' in context_source
+        or 'Set sourceData = TryGetWorksheet(sourceWb, "data")' in context_source
+    ):
+        errors.append('modWorkbookContext.bas: lookup of the exact data sheet is missing')
+    if 'Private Function TryGetWorksheet(' in context_source:
+        helper_start = context_source.index('Private Function TryGetWorksheet(')
+        helper_end = context_source.find('End Function', helper_start)
+        helper_source = context_source[helper_start:helper_end]
+        if 'If lookupError = 18 Then Err.Raise 18' not in helper_source:
+            errors.append('modWorkbookContext.bas: worksheet lookup must pass Ctrl+Break to the caller')
 
 # Лист data_full нельзя очищать до сохранения резервной копии,
 # а при отсутствии заполненных пар прежний результат должен оставаться нетронутым.
