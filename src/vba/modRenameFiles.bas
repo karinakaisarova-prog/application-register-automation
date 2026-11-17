@@ -166,6 +166,11 @@ ContinueRow:
             End If
             If Err.Number <> 0 Then
                 failure = "Не удалось обновить гиперссылку в строке " & item("Row") & ": " & Err.Description
+                If Err.Number = 18 Then
+                    Err.Clear
+                    On Error GoTo Failed
+                    Err.Raise 18, "RenameFilesFromRegister", failure
+                End If
                 Err.Clear
                 On Error GoTo Failed
                 Err.Raise vbObjectError + 2401, "RenameFilesFromRegister", failure
@@ -475,17 +480,27 @@ End Sub
 
 
 Private Function RestoreRegisterHyperlink(ByVal targetWs As Worksheet, ByVal rowNo As Long, ByVal filePath As String) As String
+    Dim savedErrNumber As Long
+    Dim savedErrDescription As String
     On Error GoTo LinkError
     targetWs.Cells(rowNo, COL_LINK).Hyperlinks.Delete
     targetWs.Hyperlinks.Add Anchor:=targetWs.Cells(rowNo, COL_LINK), _
         Address:=filePath, TextToDisplay:="Открыть файл"
     Exit Function
 LinkError:
-    RestoreRegisterHyperlink = Err.Description
+    savedErrNumber = Err.Number
+    savedErrDescription = Err.Description
+    If savedErrNumber = 18 Then
+        On Error GoTo 0
+        Err.Raise savedErrNumber, "RestoreRegisterHyperlink", savedErrDescription
+    End If
+    RestoreRegisterHyperlink = savedErrDescription
     Err.Clear
 End Function
 
 Private Function TryRenameFile(ByVal oldPath As String, ByVal newPath As String) As String
+    Dim savedErrNumber As Long
+    Dim savedErrDescription As String
     On Error GoTo RenameError
     If Len(Dir$(oldPath)) = 0 Then
         TryRenameFile = "Исходный файл не найден."
@@ -498,15 +513,30 @@ Private Function TryRenameFile(ByVal oldPath As String, ByVal newPath As String)
     Name oldPath As newPath
     Exit Function
 RenameError:
-    TryRenameFile = Err.Description
+    savedErrNumber = Err.Number
+    savedErrDescription = Err.Description
+    If savedErrNumber = 18 Then
+        On Error GoTo 0
+        Err.Raise savedErrNumber, "TryRenameFile", savedErrDescription
+    End If
+    TryRenameFile = savedErrDescription
     Err.Clear
 End Function
 
 Private Function RegisterFilePath(ByVal c As Range) As String
     Dim linkAddress As String
+    Dim savedErrNumber As Long
+    Dim savedErrDescription As String
     On Error Resume Next
+    Err.Clear
     If c.Hyperlinks.Count > 0 Then
         linkAddress = Trim$(CStr(c.Hyperlinks(1).Address))
+        If Err.Number = 18 Then
+            savedErrNumber = Err.Number
+            savedErrDescription = Err.Description
+            On Error GoTo 0
+            Err.Raise savedErrNumber, "RegisterFilePath", savedErrDescription
+        End If
         If Len(linkAddress) = 0 Then Exit Function
         RegisterFilePath = linkAddress
     Else
