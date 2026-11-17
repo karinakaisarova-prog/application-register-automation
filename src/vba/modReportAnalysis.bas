@@ -124,7 +124,7 @@ Public Sub ScanWordReportMentions()
                 ' в одном длинном абзаце могут быть упоминания на разных страницах.
                 Set rng = wdDoc.Range(para.Range.Start + CLng(mt.FirstIndex), _
                                       para.Range.Start + CLng(mt.FirstIndex) + CLng(mt.Length))
-                pageNo = CLng(rng.Information(1)) ' wdActiveEndAdjustedPageNumber: page number as displayed in Word
+                pageNo = CLng(rng.Information(1)) ' Номер страницы с учётом отображения в документе Word
                 ws.Cells(rowOut, 1).Value = rowOut - FIRST_RESULT_ROW + 1
                 ws.Cells(rowOut, 2).Value = mt.Value
                 ws.Cells(rowOut, 3).Value = pageNo
