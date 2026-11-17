@@ -156,7 +156,7 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
     ApplyLookups ws
     ws.Columns(TEMP_SORT_COL).Hidden = True
     ws.Activate
-    CreateRegisterControlPanel ws
+    TryCreateRegisterControlPanel ws
     If Not backupWs Is Nothing Then
         Application.DisplayAlerts = False
         backupWs.Delete
@@ -249,6 +249,20 @@ CleanExit:
     Application.Calculation = oldCalculation
     Application.StatusBar = oldStatusBar
     Application.EnableCancelKey = oldCancelKey
+End Sub
+
+Private Sub TryCreateRegisterControlPanel(ByVal ws As Worksheet)
+    On Error GoTo PanelFailed
+    CreateRegisterControlPanel ws
+    Exit Sub
+
+PanelFailed:
+    If Err.Number = 18 Then
+        On Error GoTo 0
+        Err.Raise 18
+    End If
+    LogApplicationsListLine "Не удалось создать панель кнопок: " & Err.Description
+    Err.Clear
 End Sub
 
 Private Function GetUniqueRecoverySheetName() As String
