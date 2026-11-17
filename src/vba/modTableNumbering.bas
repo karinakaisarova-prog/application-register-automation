@@ -533,6 +533,7 @@ Private Function GetManualCaptionPrefixLength(ByVal captionText As String) As Lo
     Dim rx As Object
     Dim matches As Object
     Dim leadingLength As Long
+    Dim nextChar As String
     captionText = Replace(captionText, ChrW(160), " ")
     Do While leadingLength < Len(captionText) And _
         (Mid$(captionText, leadingLength + 1, 1) = " " Or Mid$(captionText, leadingLength + 1, 1) = vbTab)
@@ -548,6 +549,14 @@ Private Function GetManualCaptionPrefixLength(ByVal captionText As String) As Lo
     If rx.Test(captionText) Then
         Set matches = rx.Execute(captionText)
         GetManualCaptionPrefixLength = matches(0).Length
+        If GetManualCaptionPrefixLength < Len(captionText) Then
+            nextChar = Mid$(captionText, GetManualCaptionPrefixLength + 1, 1)
+            If nextChar <> " " And nextChar <> vbTab And nextChar <> "." And _
+               nextChar <> "," And nextChar <> ":" And nextChar <> ";" And _
+               nextChar <> ChrW(8211) And nextChar <> ChrW(8212) And nextChar <> "-" Then
+                GetManualCaptionPrefixLength = 0
+            End If
+        End If
     End If
 End Function
 
