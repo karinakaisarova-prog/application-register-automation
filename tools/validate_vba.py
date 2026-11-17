@@ -6,6 +6,20 @@ root = Path(__file__).resolve().parents[1]
 modules = sorted((root / 'src' / 'vba').glob('*.bas'))
 errors = []
 seen = {}
+
+comment_modules = modules + sorted((root / 'examples').glob('*.bas'))
+for comment_path in comment_modules:
+    comment_lines = comment_path.read_text(encoding='utf-8-sig').splitlines()
+    for comment_number, comment_line in enumerate(comment_lines, 1):
+        stripped_comment = comment_line.strip()
+        if (
+            stripped_comment.startswith("'")
+            and re.search(r'[A-Za-z]{3,}', stripped_comment)
+            and not re.search(r'[А-Яа-яЁё]', stripped_comment)
+        ):
+            errors.append(
+                f'{comment_path.relative_to(root)}:{comment_number}: English-only VBA comment'
+            )
 required = {
     'StartRegisterAutomation',
     'CreateMultiFolderApplicationsListCorrected',
