@@ -129,7 +129,10 @@ Public Sub CheckAndFixWordBulletLists()
                         Call GetTypedMarker(txt, markerOffset, markerLength)
                         pageNo = 0
                         On Error Resume Next
+                        Err.Clear
                         pageNo = para.Range.Information(3) ' wdActiveEndPageNumber
+                        If Err.Number = 18 Then GoTo Failed
+                        Err.Clear
                         On Error GoTo Failed
                         ws.Cells(rowOut, 1).Value = groupNo
                         ws.Cells(rowOut, 2).Value = pageNo
@@ -413,7 +416,9 @@ Private Function GetBulletIndentLevel(ByVal para As Object, ByVal paragraphText 
     Dim i As Long
     Dim ch As String
     On Error Resume Next
+    Err.Clear
     GetBulletIndentLevel = CDbl(para.Format.LeftIndent)
+    If Err.Number = 18 Then Err.Raise Err.Number, "GetBulletIndentLevel", Err.Description
     If Err.Number <> 0 Then
         Err.Clear
         GetBulletIndentLevel = 0
@@ -436,7 +441,9 @@ End Function
 
 Private Function IsNativeWordList(ByVal para As Object) As Boolean
     On Error Resume Next
+    Err.Clear
     IsNativeWordList = (CLng(para.Range.ListFormat.ListType) <> WD_LIST_NO_NUMBERING)
+    If Err.Number = 18 Then Err.Raise Err.Number, "IsNativeWordList", Err.Description
     If Err.Number <> 0 Then
         Err.Clear
         IsNativeWordList = False
