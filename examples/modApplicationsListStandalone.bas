@@ -812,7 +812,7 @@ End Function
 ' Окно выбора папки может вернуть веб-адрес SharePoint вместо пути Windows.
 ' Перед обращением к файловой системе преобразует адрес в сетевой путь WebDAV Windows.
 ' Например:
-' http://server:55555/SD/Folder -> \\server@55555\DavWWWRoot\SD\Folder
+' Пример преобразования веб-адреса папки в сетевой путь WebDAV Windows.
 Private Function NormalizeSelectedRootPath(ByVal selectedPath As String) As String
     Dim schemeEnd As Long
     Dim slashAfterHost As Long
