@@ -115,7 +115,7 @@ Public Sub CheckAndNumberWordTables()
         If hasSeq Then
             ws.Cells(r, 5).Value = "Нумерация найдена"
         ElseIf IsTableCaptionText(captionText) Then
-            ws.Cells(r, 5).Value = "Текстовая подпись без SEQ — ручная проверка"
+            ws.Cells(r, 5).Value = "Текстовая подпись без SEQ — будет преобразована"
             manualCaptionCount = manualCaptionCount + 1
         Else
             ws.Cells(r, 5).Value = "Требуется добавить подпись"
@@ -153,28 +153,20 @@ Public Sub CheckAndNumberWordTables()
         GoTo CleanExit
     End If
 
-    If missingCount = 0 Then
-        If manualCaptionCount > 0 Then
-            MsgBox "Проверка завершена. Таблиц: " & tableCount & _
-                   vbCrLf & "Текстовых подписей без поля SEQ: " & manualCaptionCount & _
-                   vbCrLf & "Эти подписи не изменены автоматически, чтобы не создавать дубликаты. Проверьте их вручную." & _
-                   vbCrLf & "Отчёт проверки записан на лист '" & TABLE_REPORT_SHEET & "'.", _
-                   vbExclamation, "Проверка таблиц"
-        Else
-            MsgBox "Проверка завершена. Найдено таблиц: " & tableCount & _
-                   vbCrLf & "У всех таблиц найдены подписи с полем SEQ «Таблица»." & _
-                   vbCrLf & "Отчёт проверки записан на лист '" & TABLE_REPORT_SHEET & "'.", _
-                   vbInformation, "Проверка таблиц"
-        End If
+    If missingCount = 0 And manualCaptionCount = 0 Then
+        MsgBox "Проверка завершена. Найдено таблиц: " & tableCount & _
+               vbCrLf & "У всех таблиц найдены подписи с полем SEQ «Таблица»." & _
+               vbCrLf & "Отчёт проверки записан на лист '" & TABLE_REPORT_SHEET & "'.", _
+               vbInformation, "Проверка таблиц"
         GoTo CleanExit
     End If
 
     answer = MsgBox("Предварительная проверка завершена." & vbCrLf & _
                     "Всего таблиц: " & tableCount & vbCrLf & _
                     "Таблиц без подписи: " & missingCount & vbCrLf & _
-                    "Текстовых подписей без SEQ (будут пропущены): " & manualCaptionCount & vbCrLf & vbCrLf & _
-                    "Добавить подписи только таблицам без подписи, обновить поля и сохранить Word-отчёт?" & _
-                    vbCrLf & "Текстовые подписи без SEQ автоматически не заменяются, чтобы избежать дубликатов." & _
+                    "Текстовых подписей без SEQ (будут преобразованы): " & manualCaptionCount & vbCrLf & vbCrLf & _
+                    "Добавить подписи отсутствующим таблицам и преобразовать существующие текстовые подписи в поля SEQ?" & _
+                    vbCrLf & "Текст после номера будет сохранён." & _
                     vbCrLf & "Перед изменением рекомендуется иметь резервную копию.", _
                     vbYesNo + vbQuestion + vbDefaultButton2, "Подтверждение нумерации")
     If answer <> vbYes Then
@@ -196,11 +188,14 @@ Public Sub CheckAndNumberWordTables()
         DoEvents
         Set tbl = wdDoc.Tables(r)
         captionText = GetPreviousCaptionText(wdDoc, tbl.Range.Start)
-        If Not HasTableSequenceField(wdDoc, tbl.Range.Start) And _
-           Not IsTableCaptionText(captionText) Then
-            InsertCustomTableCaption wdApp, wdDoc, tbl
+        If Not HasTableSequenceField(wdDoc, tbl.Range.Start) Then
+            If IsTableCaptionText(captionText) Then
+                ConvertManualTableCaptionToSequence wdDoc, tbl
+            Else
+                InsertCustomTableCaption wdApp, wdDoc, tbl
+            End If
             insertedCount = insertedCount + 1
-            Application.StatusBar = "Добавление подписей: " & insertedCount & " из " & missingCount
+            Application.StatusBar = "Обработка подписей: " & insertedCount & " из " & (missingCount + manualCaptionCount)
         End If
     Next r
 
@@ -229,13 +224,11 @@ Public Sub CheckAndNumberWordTables()
         finalWs.Cells(r, 2).Value = pageNo
         finalWs.Cells(r, 3).Value = captionText
         finalWs.Cells(r, 4).Value = IIf(hasSeq, "Да", "Нет")
-        If hasSeq Then
-            finalWs.Cells(r, 5).Value = "Нумерация найдена"
-        ElseIf IsTableCaptionText(captionText) Then
-            finalWs.Cells(r, 5).Value = "Подпись без SEQ — проверьте вручную"
-        Else
-            finalWs.Cells(r, 5).Value = "Проверьте вручную"
+        If Not hasSeq Then
+            Err.Raise vbObjectError + 712, "CheckAndNumberWordTables", _
+                      "После обработки не удалось подтвердить поле SEQ у таблицы № " & (r - FIRST_DATA_ROW + 1) & "."
         End If
+        finalWs.Cells(r, 5).Value = "Нумерация найдена"
         finalWs.Cells(r, 6).Value = reportPath
         finalWs.Cells(r, 7).Value = r - FIRST_DATA_ROW + 1
         r = r + 1
@@ -527,7 +520,12 @@ Private Function GetPreviousCaptionText(ByVal wdDoc As Object, ByVal tableStart 
 End Function
 
 Private Function IsTableCaptionText(ByVal captionText As String) As Boolean
+    IsTableCaptionText = (GetManualCaptionPrefixLength(captionText) > 0)
+End Function
+
+Private Function GetManualCaptionPrefixLength(ByVal captionText As String) As Long
     Dim rx As Object
+    Dim matches As Object
     captionText = Replace(captionText, ChrW(160), " ")
     captionText = Trim$(captionText)
     If Len(captionText) = 0 Then Exit Function
@@ -535,9 +533,45 @@ Private Function IsTableCaptionText(ByVal captionText As String) As Boolean
     Set rx = CreateObject("VBScript.RegExp")
     rx.Global = False
     rx.IgnoreCase = True
-    rx.Pattern = "^Таблица\s*(№|N|#)?\s*[0-9]+[А-ЯA-Z]?(\s|[.,:;–—-]|$)"
-    IsTableCaptionText = rx.Test(captionText)
+    rx.Pattern = "^Таблица\s*(№|N|#)?\s*[0-9]+[А-ЯA-Z]?"
+    If rx.Test(captionText) Then
+        Set matches = rx.Execute(captionText)
+        GetManualCaptionPrefixLength = matches(0).Length
+    End If
 End Function
+
+Private Sub ConvertManualTableCaptionToSequence(ByVal wdDoc As Object, ByVal tbl As Object)
+    Dim captionPara As Object
+    Dim prefixRange As Object
+    Dim insertRange As Object
+    Dim fld As Object
+    Dim captionText As String
+    Dim prefixLength As Long
+    Dim tableStart As Long
+
+    tableStart = tbl.Range.Start
+    Set captionPara = GetCaptionParagraphBeforeTable(wdDoc, tableStart)
+    If captionPara Is Nothing Then
+        Err.Raise vbObjectError + 713, "ConvertManualTableCaptionToSequence", _
+                  "Не найдена существующая подпись над таблицей."
+    End If
+
+    captionText = Replace(CStr(captionPara.Text), vbCr, "")
+    captionText = Replace(captionText, Chr$(7), "")
+    captionText = Replace(captionText, ChrW(160), " ")
+    prefixLength = GetManualCaptionPrefixLength(captionText)
+    If prefixLength = 0 Then
+        Err.Raise vbObjectError + 714, "ConvertManualTableCaptionToSequence", _
+                  "Не удалось определить номер в существующей подписи таблицы."
+    End If
+
+    Set prefixRange = wdDoc.Range(captionPara.Start, captionPara.Start + prefixLength)
+    prefixRange.Text = ""
+    Set insertRange = wdDoc.Range(captionPara.Start, captionPara.Start)
+    Set fld = wdDoc.Fields.Add(insertRange, WD_FIELD_SEQUENCE, "Таблица", False)
+    fld.Code.Text = " SEQ Таблица \# ""'Таблица № '0'"" "
+    fld.Update
+End Sub
 
 Private Sub EnsureTableCaptionLabel(ByVal wdDoc As Object)
     Dim label As Object
