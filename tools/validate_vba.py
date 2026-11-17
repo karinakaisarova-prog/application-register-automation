@@ -149,12 +149,56 @@ if panel_module.exists():
                 errors.append('modRegisterPanel.bas: safe panel replacement guard missing: ' + fragment)
         if 'Private Function GetUniquePanelPrefix(ByVal ws As Worksheet) As String' not in panel_source:
             errors.append('modRegisterPanel.bas: unique temporary panel naming is missing')
+        captions_array = re.search(r'\\bbuttonCaptions\\s*=\\s*Array\\((.*?)\\)', panel_source, re.I | re.S)
+        if not captions_array:
+            errors.append('modRegisterPanel.bas: buttonCaptions array not found')
+        else:
+            caption_count = len(re.findall(r'\"([^\"]+)\"', captions_array.group(1)))
+            macro_count = len(re.findall(r'\"([^\"]+)\"', macro_array.group(1)))
+            if caption_count != macro_count:
+                errors.append('modRegisterPanel.bas: button captions and macro targets count do not match')
+            if caption_count != 10:
+                errors.append('modRegisterPanel.bas: expected 10 panel buttons')
+        if 'For i = LBound(buttonCaptions) To UBound(buttonCaptions)' not in panel_source:
+            errors.append('modRegisterPanel.bas: buttons must be created from the complete captions array')
+        if 'shp.OnAction = \"\'\" & workbookRef & CStr(macroNames(i))' not in panel_source:
+            errors.append('modRegisterPanel.bas: each button must receive its matching macro target')
 
 # Объект определяется по выбранной папке и её вложенным папкам, затем по имени файла.
 # Совпадение в родительской папке за пределами выбранной папки не должно менять объект.
 list_module = root / 'src' / 'vba' / 'modApplicationsList.bas'
 if list_module.exists():
     source = list_module.read_text(encoding='utf-8-sig')
+    main_match = re.search(
+        r'Public Sub CreateMultiFolderApplicationsListCorrected\\b(.*?)^End Sub',
+        source, re.I | re.M | re.S
+    )
+    if not main_match:
+        errors.append('modApplicationsList.bas: list builder entry point not found')
+    else:
+        main_code = main_match.group(1)
+        build_pos = main_code.find('BuildOutputSheet ws, mFiles, mSections')
+        panel_pos = main_code.find('TryCreateRegisterControlPanel ws')
+        cleanup_pos = main_code.find('backupWs.Delete', panel_pos)
+        if build_pos < 0 or panel_pos < 0 or cleanup_pos < 0 or not (build_pos < panel_pos < cleanup_pos):
+            errors.append('modApplicationsList.bas: panel must refresh after list creation and before backup cleanup')
+    panel_wrapper = re.search(
+        r'Private Sub TryCreateRegisterControlPanel\\b(.*?)^End Sub',
+        source, re.I | re.M | re.S
+    )
+    if not panel_wrapper:
+        errors.append('modApplicationsList.bas: panel refresh wrapper not found')
+    else:
+        wrapper_code = panel_wrapper.group(1)
+        for fragment in ('CreateRegisterControlPanel ws', 'If Err.Number = 18 Then', 'Err.Raise 18', 'failureNumber = Err.Number', 'failureDescription = Err.Description', 'LogApplicationsListLine'):
+            if fragment not in wrapper_code:
+                errors.append('modApplicationsList.bas: panel refresh error handling missing: ' + fragment)
+    output_match = re.search(
+        r'Private Sub BuildOutputSheet\\b(.*?)^End Sub',
+        source, re.I | re.M | re.S
+    )
+    if output_match and 'ws.Shapes' in output_match.group(1):
+        errors.append('modApplicationsList.bas: rebuilding the table must not delete or replace panel shapes directly')
     object_match = re.search(
         r'Private Function GetObjectName\b(.*?)^End Function\s*$',
         source, re.I | re.M | re.S
