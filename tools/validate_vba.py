@@ -372,16 +372,21 @@ if table_module.exists():
         if fragment not in table_source:
             errors.append('modTableNumbering.bas: staged final-report replacement guard missing: ' + fragment)
 
-# Проверяет, что автоматическая подпись не дублируется, если рядом уже есть обычная подпись.
+# Проверяет, что существующая текстовая подпись преобразуется в SEQ без потери названия.
 if table_module.exists():
     for fragment in (
         'Private Function IsTableCaptionText(',
         'manualCaptionCount = manualCaptionCount + 1',
-        'Not IsTableCaptionText(captionText)',
+        'If IsTableCaptionText(captionText) Then',
+        'ConvertManualTableCaptionToSequence wdDoc, tbl',
+        'GetManualCaptionPrefixLength(captionText)',
+        'prefixRange.Text = ""',
+        'fld.Code.Text = " SEQ Таблица \\# ""\'Таблица № \'0\'"" "',
         'para.Information(WD_WITHIN_TABLE) = False',
+        'If Not HasTableSequenceField(wdDoc, tbl.Range.Start) Then',
     ):
         if fragment not in table_source:
-            errors.append('modTableNumbering.bas: manual-caption protection missing: ' + fragment)
+            errors.append('modTableNumbering.bas: manual-caption conversion guard missing: ' + fragment)
 
 # Проверяет текущую схему работы в одной книге. Макрос запуска должен
 # проверить наличие нужного листа data, назначить рабочую книгу и
