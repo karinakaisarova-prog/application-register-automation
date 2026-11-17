@@ -129,6 +129,11 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
                   "а не веб-адрес в браузере." & vbCrLf & vbCrLf & _
                   "Продолжить с найденными файлами?", _
                   vbYesNo + vbExclamation + vbDefaultButton2, "Обнаружены недоступные папки") <> vbYes Then
+            If Not backupWs Is Nothing Then
+                backupWs.Delete
+                Set backupWs = Nothing
+                LogApplicationsListLine "Исходный лист не изменён; временная резервная копия удалена."
+            End If
             LogApplicationsListLine "Построение остановлено: пользователь не подтвердил создание неполного перечня."
             GoTo CleanExit
         End If
