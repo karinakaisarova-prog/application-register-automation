@@ -126,7 +126,30 @@ if panel_module.exists():
 
     # Новая панель должна быть полностью создана до удаления старых кнопок.
     panel_create = re.search(
-        r'Public Sub CreateRegisterControlPanel\\b(.*?)^End Sub\\s*
+        r'Public Sub CreateRegisterControlPanel\\b(.*?)^End Sub\\s*$',
+        panel_source, re.I | re.M | re.S
+    )
+    if not panel_create:
+        errors.append('modRegisterPanel.bas: CreateRegisterControlPanel procedure not found')
+    else:
+        panel_code = panel_create.group(1)
+        add_pos = panel_code.find('ws.Shapes.AddShape')
+        commit_pos = panel_code.find('replacementStarted = True')
+        old_delete_pos = panel_code.find('ws.Shapes(i).Delete', commit_pos)
+        if add_pos < 0 or commit_pos < 0 or old_delete_pos < 0 or not (add_pos < commit_pos < old_delete_pos):
+            errors.append('modRegisterPanel.bas: old buttons must be deleted only after the new panel is created')
+        for fragment in (
+            'shp.Name = batchPrefix & CStr(i + 1)',
+            'If Left$(ws.Shapes(i).Name, Len(batchPrefix)) <> batchPrefix Then',
+            'If Not replacementStarted And Len(batchPrefix) > 0 Then',
+            'If Not shp Is Nothing Then shp.Delete',
+            'Err.Raise failureNumber, "CreateRegisterControlPanel", failureDescription',
+        ):
+            if fragment not in panel_code:
+                errors.append('modRegisterPanel.bas: safe panel replacement guard missing: ' + fragment)
+        if 'Private Function GetUniquePanelPrefix(ByVal ws As Worksheet) As String' not in panel_source:
+            errors.append('modRegisterPanel.bas: unique temporary panel naming is missing')
+
 # Объект определяется по выбранной папке и её вложенным папкам, затем по имени файла.
 # Совпадение в родительской папке за пределами выбранной папки не должно менять объект.
 list_module = root / 'src' / 'vba' / 'modApplicationsList.bas'
