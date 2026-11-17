@@ -526,8 +526,13 @@ End Function
 Private Function GetManualCaptionPrefixLength(ByVal captionText As String) As Long
     Dim rx As Object
     Dim matches As Object
+    Dim leadingLength As Long
     captionText = Replace(captionText, ChrW(160), " ")
-    captionText = Trim$(captionText)
+    Do While leadingLength < Len(captionText) And _
+        (Mid$(captionText, leadingLength + 1, 1) = " " Or Mid$(captionText, leadingLength + 1, 1) = vbTab)
+        leadingLength = leadingLength + 1
+    Loop
+    captionText = Mid$(captionText, leadingLength + 1)
     If Len(captionText) = 0 Then Exit Function
 
     Set rx = CreateObject("VBScript.RegExp")
