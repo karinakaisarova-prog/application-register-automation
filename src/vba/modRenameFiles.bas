@@ -29,6 +29,7 @@ Public Sub RenameFilesFromRegister()
     Dim rollbackError As String
     Dim renameInProgress As Boolean
     Dim currentRenameItem As Object
+    Dim alreadyTracked As Boolean
 
     oldScreen = Application.ScreenUpdating
     oldEvents = Application.EnableEvents
@@ -209,7 +210,15 @@ Failed:
     If renameInProgress And Not currentRenameItem Is Nothing Then
         If Len(Dir$(CStr(currentRenameItem("NewPath")))) > 0 And _
            Len(Dir$(CStr(currentRenameItem("OldPath")))) = 0 Then
-            renamedItems.Add currentRenameItem
+            alreadyTracked = False
+            For rollbackIndex = 1 To renamedItems.Count
+                Set rollbackItem = renamedItems(rollbackIndex)
+                If CLng(rollbackItem("Row")) = CLng(currentRenameItem("Row")) Then
+                    alreadyTracked = True
+                    Exit For
+                End If
+            Next rollbackIndex
+            If Not alreadyTracked Then renamedItems.Add currentRenameItem
         End If
     End If
     If Not renamedItems Is Nothing Then
@@ -282,6 +291,7 @@ Public Sub RollbackLastRenameBatch()
     Dim recoveryIndex As Long
     Dim rollbackInProgress As Boolean
     Dim activeRollbackItem As Object
+    Dim alreadyTracked As Boolean
 
     oldScreen = Application.ScreenUpdating
     oldEvents = Application.EnableEvents
@@ -457,7 +467,15 @@ Failed:
     If rollbackInProgress And Not activeRollbackItem Is Nothing Then
         If Len(Dir$(CStr(activeRollbackItem("OldPath")))) > 0 And _
            Len(Dir$(CStr(activeRollbackItem("NewPath")))) = 0 Then
-            reversedItems.Add activeRollbackItem
+            alreadyTracked = False
+            For recoveryIndex = 1 To reversedItems.Count
+                Set item = reversedItems(recoveryIndex)
+                If CLng(item("LogRow")) = CLng(activeRollbackItem("LogRow")) Then
+                    alreadyTracked = True
+                    Exit For
+                End If
+            Next recoveryIndex
+            If Not alreadyTracked Then reversedItems.Add activeRollbackItem
         End If
     End If
     ' Отменяет действия отката в обратном порядке, чтобы вернуть состояние до начала отката.
