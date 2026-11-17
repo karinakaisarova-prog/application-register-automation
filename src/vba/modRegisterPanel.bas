@@ -123,6 +123,7 @@ Public Sub CreateRegisterControlPanel(ByVal ws As Worksheet)
         shp.TextFrame2.TextRange.ParagraphFormat.Alignment = msoAlignCenter
         shp.Placement = xlFreeFloating
         shp.OnAction = "'" & workbookRef & CStr(macroNames(i))
+        Set shp = Nothing
     Next i
 
     replacementStarted = True
@@ -144,6 +145,7 @@ CreationFailed:
 
     If Not replacementStarted And Len(batchPrefix) > 0 Then
         On Error Resume Next
+        If Not shp Is Nothing Then shp.Delete
         For i = ws.Shapes.Count To 1 Step -1
             If Left$(ws.Shapes(i).Name, Len(batchPrefix)) = batchPrefix Then
                 ws.Shapes(i).Delete
