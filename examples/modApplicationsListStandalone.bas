@@ -816,7 +816,7 @@ End Function
 ' Пример преобразования веб-адреса папки в сетевой путь WebDAV Windows.
 Private Function NormalizeSelectedRootPath(ByVal selectedPath As String) As String
     Dim schemeEnd As Long
-    Dim slashAfterHost As Long
+    Dim authorityEnd As Long
     Dim scheme As String
     Dim authority As String
     Dim urlPath As String
@@ -824,6 +824,8 @@ Private Function NormalizeSelectedRootPath(ByVal selectedPath As String) As Stri
     Dim portText As String
     Dim colonPos As Long
     Dim webDavServer As String
+    Dim delimiter As String
+    Dim i As Long
 
     selectedPath = Trim$(selectedPath)
     schemeEnd = InStr(1, selectedPath, "://", vbTextCompare)
@@ -839,20 +841,30 @@ Private Function NormalizeSelectedRootPath(ByVal selectedPath As String) As Stri
         Exit Function
     End If
 
-    slashAfterHost = InStr(schemeEnd + 3, selectedPath, "/")
-    If slashAfterHost = 0 Then
+    For i = schemeEnd + 3 To Len(selectedPath)
+        delimiter = Mid$(selectedPath, i, 1)
+        If delimiter = "/" Or delimiter = "?" Or delimiter = "#" Then
+            authorityEnd = i
+            Exit For
+        End If
+    Next i
+
+    If authorityEnd = 0 Then
         authority = Mid$(selectedPath, schemeEnd + 3)
         urlPath = ""
     Else
-        authority = Mid$(selectedPath, schemeEnd + 3, slashAfterHost - (schemeEnd + 3))
-        urlPath = Mid$(selectedPath, slashAfterHost + 1)
+        authority = Mid$(selectedPath, schemeEnd + 3, authorityEnd - (schemeEnd + 3))
+        If delimiter = "/" Then
+            urlPath = Mid$(selectedPath, authorityEnd + 1)
+        Else
+            urlPath = ""
+        End If
     End If
 
-    ' Удаляет параметры запроса и фрагмент адреса, если они присутствуют.
     If InStr(urlPath, "?") > 0 Then urlPath = Left$(urlPath, InStr(urlPath, "?") - 1)
     If InStr(urlPath, "#") > 0 Then urlPath = Left$(urlPath, InStr(urlPath, "#") - 1)
     urlPath = DecodeUrlPath(urlPath)
-    urlPath = Replace(urlPath, "/", "\")
+    urlPath = Replace(urlPath, "/", "\\")
 
     serverName = authority
     portText = ""
@@ -875,8 +887,8 @@ Private Function NormalizeSelectedRootPath(ByVal selectedPath As String) As Stri
         If Len(portText) > 0 And portText <> "80" Then webDavServer = webDavServer & "@" & portText
     End If
 
-    NormalizeSelectedRootPath = "\\" & webDavServer & "\DavWWWRoot"
-    If Len(urlPath) > 0 Then NormalizeSelectedRootPath = NormalizeSelectedRootPath & "\" & urlPath
+    NormalizeSelectedRootPath = "\\\\" & webDavServer & "\\DavWWWRoot"
+    If Len(urlPath) > 0 Then NormalizeSelectedRootPath = NormalizeSelectedRootPath & "\\" & urlPath
 
     LogLine "Адрес SharePoint преобразован в путь Windows WebDAV: " & NormalizeSelectedRootPath
 End Function
