@@ -257,6 +257,30 @@ if list_module.exists():
         if fragment not in sharepoint_source:
             errors.append('modApplicationsList.bas: SharePoint path handling missing or malformed: ' + fragment)
 
+# Проверяет, что инструкции различают WebDAV и локальную синхронизацию SharePoint.
+sharepoint_doc = root / 'docs' / 'sharepoint-troubleshooting.md'
+sharepoint_tests = root / 'tests' / 'test-checklist.md'
+if sharepoint_doc.exists():
+    doc_text = sharepoint_doc.read_text(encoding='utf-8-sig')
+    for fragment in (
+        'http://stksps01:55555/SD/',
+        '\\\\\\\\stksps01@55555\\\\DavWWWRoot',
+        'синхронизированной папки',
+        'WebClient',
+    ):
+        if fragment not in doc_text:
+            errors.append('sharepoint-troubleshooting.md: SharePoint path guidance missing: ' + fragment)
+if sharepoint_tests.exists():
+    test_text = sharepoint_tests.read_text(encoding='utf-8-sig')
+    for fragment in (
+        'WebDAV-пути',
+        'UTF-8-кодированными кириллическими символами',
+        'локальный путь',
+        'Проводнике Windows',
+    ):
+        if fragment not in test_text:
+            errors.append('test-checklist.md: SharePoint scenario test missing: ' + fragment)
+
 # Если после переименования не удалось обновить ссылку в перечне, пакетная операция должна считаться неудачной.
 rename_module = root / "src" / "vba" / "modRenameFiles.bas"
 if rename_module.exists():
