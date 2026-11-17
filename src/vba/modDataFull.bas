@@ -68,7 +68,7 @@ Public Sub BuildDataFull()
         DoEvents
         If IsError(sourceWs.Cells(r, COL_SECTION).Value) Or _
            IsError(sourceWs.Cells(r, COL_RESPONSIBLE).Value) Then
-            LogLine "Пропущена строка " & r & ": в столбце «Раздел» или «Ответственное лицо» содержится ошибка Excel."
+            LogDataFullLine "Пропущена строка " & r & ": в столбце «Раздел» или «Ответственное лицо» содержится ошибка Excel."
         Else
             sectionText = Trim$(CStr(sourceWs.Cells(r, COL_SECTION).Value))
             personText = Trim$(CStr(sourceWs.Cells(r, COL_RESPONSIBLE).Value))
@@ -271,7 +271,7 @@ Private Function GetUniqueDataFullBackupName() As String
     GetUniqueDataFullBackupName = candidate
 End Function
 
-Private Sub LogLine(ByVal message As String)
+Private Sub LogDataFullLine(ByVal message As String)
     Application.StatusBar = message
     DoEvents
 End Sub
