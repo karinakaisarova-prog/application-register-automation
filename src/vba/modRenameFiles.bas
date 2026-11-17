@@ -301,11 +301,18 @@ Public Sub RollbackLastRenameBatch()
     For r = lastRow To 2 Step -1
         candidateOldPath = CStr(logWs.Cells(r, 4).Value)
         candidateNewPath = CStr(logWs.Cells(r, 6).Value)
+        statusText = CStr(logWs.Cells(r, 7).Value)
         If Len(Trim$(CStr(logWs.Cells(r, 8).Value))) > 0 And _
            Len(candidateOldPath) > 0 And Len(candidateNewPath) > 0 Then
             If Len(Dir$(candidateNewPath)) > 0 And Len(Dir$(candidateOldPath)) = 0 Then
                 batchId = Trim$(CStr(logWs.Cells(r, 8).Value))
                 Exit For
+            ElseIf Len(Dir$(candidateOldPath)) > 0 And Len(Dir$(candidateNewPath)) = 0 Then
+                If Left$(statusText, Len("Файл возвращён; ошибка восстановления ссылки:")) = "Файл возвращён; ошибка восстановления ссылки:" Or _
+                   Left$(statusText, Len("Ошибка восстановления после прерывания:")) = "Ошибка восстановления после прерывания:" Then
+                    batchId = Trim$(CStr(logWs.Cells(r, 8).Value))
+                    Exit For
+                End If
             End If
         End If
     Next r
