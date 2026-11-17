@@ -55,13 +55,12 @@ PanelFailed:
     failureNumber = Err.Number
     failureDescription = Err.Description
     On Error GoTo 0
-    MsgBox "Не удалось создать панель макросов." & vbCrLf & _
+    MsgBox "Не удалось полностью обновить панель макросов. Новые кнопки могли быть добавлены, а прежние — остаться." & vbCrLf & _
            "Ошибка " & failureNumber & ": " & failureDescription, _
            vbExclamation, "Панель макросов"
 End Sub
 
 Public Sub CreateRegisterControlPanel(ByVal ws As Worksheet)
-    Dim buttonNames As Variant
     Dim buttonCaptions As Variant
     Dim macroNames As Variant
     Dim i As Long
@@ -70,10 +69,14 @@ Public Sub CreateRegisterControlPanel(ByVal ws As Worksheet)
     Dim topPos As Double
     Dim actionName As String
     Dim workbookRef As String
+    Dim batchPrefix As String
+    Dim replacementStarted As Boolean
+    Dim failureNumber As Long
+    Dim failureDescription As String
 
     If ws Is Nothing Then Exit Sub
 
-    DeleteRegisterControlPanel ws
+    On Error GoTo CreationFailed
 
     buttonCaptions = Array( _
         "Повторно создать перечень", _
@@ -99,6 +102,7 @@ Public Sub CreateRegisterControlPanel(ByVal ws As Worksheet)
         "OpenMacroLaunchGuide", _
         "AddRegisterControlPanel")
 
+    batchPrefix = GetUniquePanelPrefix(ws)
     workbookRef = Replace(ThisWorkbook.Name, "'", "''") & "'!"
     leftPos = ws.Columns(PANEL_LEFT_COLUMN).Left
     topPos = ws.Rows(1).Top
@@ -111,7 +115,7 @@ Public Sub CreateRegisterControlPanel(ByVal ws As Worksheet)
             BUTTON_WIDTH, _
             BUTTON_HEIGHT)
 
-        shp.Name = PANEL_PREFIX & CStr(i + 1)
+        shp.Name = batchPrefix & CStr(i + 1)
         shp.TextFrame2.TextRange.Text = CStr(buttonCaptions(i))
         shp.TextFrame2.TextRange.Font.Name = "Arial"
         shp.TextFrame2.TextRange.Font.Size = 9
@@ -120,7 +124,65 @@ Public Sub CreateRegisterControlPanel(ByVal ws As Worksheet)
         shp.Placement = xlFreeFloating
         shp.OnAction = "'" & workbookRef & CStr(macroNames(i))
     Next i
+
+    replacementStarted = True
+
+    For i = ws.Shapes.Count To 1 Step -1
+        If Left$(ws.Shapes(i).Name, Len(PANEL_PREFIX)) = PANEL_PREFIX Then
+            If Left$(ws.Shapes(i).Name, Len(batchPrefix)) <> batchPrefix Then
+                ws.Shapes(i).Delete
+            End If
+        End If
+    Next i
+
+    On Error GoTo 0
+    Exit Sub
+
+CreationFailed:
+    failureNumber = Err.Number
+    failureDescription = Err.Description
+
+    If Not replacementStarted And Len(batchPrefix) > 0 Then
+        On Error Resume Next
+        For i = ws.Shapes.Count To 1 Step -1
+            If Left$(ws.Shapes(i).Name, Len(batchPrefix)) = batchPrefix Then
+                ws.Shapes(i).Delete
+            End If
+        Next i
+        On Error GoTo 0
+    End If
+
+    If failureNumber = 18 Then Err.Raise 18
+    Err.Raise failureNumber, "CreateRegisterControlPanel", failureDescription
 End Sub
+
+Private Function GetUniquePanelPrefix(ByVal ws As Worksheet) As String
+    Dim basePrefix As String
+    Dim candidate As String
+    Dim suffix As Long
+    Dim i As Long
+    Dim exists As Boolean
+
+    basePrefix = PANEL_PREFIX & "new_" & Format$(Now, "yyyymmddhhnnss")
+    candidate = basePrefix & "_"
+
+    Do
+        exists = False
+        For i = 1 To ws.Shapes.Count
+            If Left$(ws.Shapes(i).Name, Len(candidate)) = candidate Then
+                exists = True
+                Exit For
+            End If
+        Next i
+
+        If exists Then
+            suffix = suffix + 1
+            candidate = basePrefix & "_" & CStr(suffix) & "_"
+        End If
+    Loop While exists
+
+    GetUniquePanelPrefix = candidate
+End Function
 
 Public Sub DeleteRegisterControlPanel(ByVal ws As Worksheet)
     Dim i As Long
