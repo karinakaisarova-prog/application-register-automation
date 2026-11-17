@@ -415,10 +415,17 @@ End Function
 Private Function GetBulletIndentLevel(ByVal para As Object, ByVal paragraphText As String) As Double
     Dim i As Long
     Dim ch As String
+    Dim savedErrNumber As Long
+    Dim savedErrDescription As String
     On Error Resume Next
     Err.Clear
     GetBulletIndentLevel = CDbl(para.Format.LeftIndent)
-    If Err.Number = 18 Then Err.Raise Err.Number, "GetBulletIndentLevel", Err.Description
+    If Err.Number = 18 Then
+        savedErrNumber = Err.Number
+        savedErrDescription = Err.Description
+        On Error GoTo 0
+        Err.Raise savedErrNumber, "GetBulletIndentLevel", savedErrDescription
+    End If
     If Err.Number <> 0 Then
         Err.Clear
         GetBulletIndentLevel = 0
@@ -440,10 +447,17 @@ Private Function GetBulletIndentLevel(ByVal para As Object, ByVal paragraphText 
 End Function
 
 Private Function IsNativeWordList(ByVal para As Object) As Boolean
+    Dim savedErrNumber As Long
+    Dim savedErrDescription As String
     On Error Resume Next
     Err.Clear
     IsNativeWordList = (CLng(para.Range.ListFormat.ListType) <> WD_LIST_NO_NUMBERING)
-    If Err.Number = 18 Then Err.Raise Err.Number, "IsNativeWordList", Err.Description
+    If Err.Number = 18 Then
+        savedErrNumber = Err.Number
+        savedErrDescription = Err.Description
+        On Error GoTo 0
+        Err.Raise savedErrNumber, "IsNativeWordList", savedErrDescription
+    End If
     If Err.Number <> 0 Then
         Err.Clear
         IsNativeWordList = False
