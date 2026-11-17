@@ -126,7 +126,7 @@ if panel_module.exists():
 
     # Новая панель должна быть полностью создана до удаления старых кнопок.
     panel_create = re.search(
-        r'Public Sub CreateRegisterControlPanel\b(.*?)^End Sub\s*,
+        r'Public Sub CreateRegisterControlPanel\b(.*?)^End Sub',
         panel_source, re.I | re.M | re.S
     )
     if not panel_create:
