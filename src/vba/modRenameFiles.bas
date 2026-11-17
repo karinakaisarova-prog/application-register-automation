@@ -339,7 +339,11 @@ Public Sub RollbackLastRenameBatch()
                    statusText = "Откатан" Or _
                    statusText = "Автоматически отменён после прерывания" Or _
                    Left$(statusText, Len("Ошибка автоматического отката:")) = "Ошибка автоматического отката:" Or _
-                   Left$(statusText, Len("Ошибка отката:")) = "Ошибка отката:" Then
+                   Left$(statusText, Len("Ошибка восстановления после прерывания:")) = "Ошибка восстановления после прерывания:" Or _
+                   statusText = "Ошибка отката" Or _
+                   Left$(statusText, Len("Ошибка отката:")) = "Ошибка отката:" Or _
+                   statusText = "Откат пропущен" Or _
+                   Left$(statusText, Len("Откат пропущен:")) = "Откат пропущен:" Then
                     sheetName = CStr(logWs.Cells(r, 2).Value)
                     registerRow = CLng(Val(logWs.Cells(r, 3).Value))
                     Set registerWs = Nothing
