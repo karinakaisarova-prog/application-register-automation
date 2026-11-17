@@ -480,11 +480,19 @@ NextRow:
     Exit Sub
 
 RowFailed:
+    If Err.Number = 18 Then
+        On Error GoTo 0
+        Err.Raise 18
+    End If
     LogLine "Не удалось сохранить значение столбца «Раздел», строка " & r & ": " & Err.Description
     Err.Clear
     Resume NextRow
 
 ReadFailed:
+    If Err.Number = 18 Then
+        On Error GoTo 0
+        Err.Raise 18
+    End If
     LogLine "Не удалось прочитать существующие значения столбца «Раздел»: " & Err.Description
     Err.Clear
 End Sub
@@ -499,6 +507,10 @@ Private Function GetCellLinkPath(ByVal c As Range) As String
     Exit Function
 
 ReadFailed:
+    If Err.Number = 18 Then
+        On Error GoTo 0
+        Err.Raise 18
+    End If
     GetCellLinkPath = ""
 End Function
 
@@ -524,14 +536,18 @@ Private Sub BuildOutputSheet(ByVal ws As Worksheet, ByVal files As Collection, B
     Dim rec As Object
     Dim sectionValue As String
     Dim sortKey As String
+    Dim hyperlinkDeleteError As Long
 
     headers = Array("№ п/п", "Объект", "№ Прил.", "Наименование", "Отдел", _
                     "Ответственное лицо", "Ссылка на файл", "Раздел", "Стр. отчёта", "Кол-во страниц")
 
     ws.Cells.Clear
     On Error Resume Next
+    Err.Clear
     ws.Hyperlinks.Delete
+    hyperlinkDeleteError = Err.Number
     On Error GoTo 0
+    If hyperlinkDeleteError = 18 Then Err.Raise 18
 
     With ws.Range("A1:J1")
         .Merge
@@ -752,17 +768,26 @@ End Function
 
 Private Function WorksheetExists(ByVal sheetName As String) As Boolean
     Dim ws As Worksheet
+    Dim lookupError As Long
     On Error Resume Next
+    Err.Clear
     Set ws = FindWorksheet(sheetName)
+    lookupError = Err.Number
+    On Error GoTo 0
+    If lookupError = 18 Then Err.Raise 18
     WorksheetExists = Not ws Is Nothing
 End Function
 
 Private Function FindWorksheet(ByVal sheetName As String) As Worksheet
     Dim foundSheet As Worksheet
+    Dim lookupError As Long
     If Len(Trim$(sheetName)) = 0 Then Exit Function
     On Error Resume Next
+    Err.Clear
     Set foundSheet = ThisWorkbook.Worksheets(sheetName)
+    lookupError = Err.Number
     On Error GoTo 0
+    If lookupError = 18 Then Err.Raise 18
     Set FindWorksheet = foundSheet
 End Function
 
@@ -854,12 +879,21 @@ Private Function GetFolderName(ByVal folderPath As String) As String
     Dim fso As Object
     Dim normalizedPath As String
     Dim separatorPos As Long
+    Dim accessError As Long
 
     normalizedPath = RemoveTrailingSlash(Trim$(folderPath))
     On Error Resume Next
+    Err.Clear
     Set fso = CreateObject("Scripting.FileSystemObject")
-    If Not fso Is Nothing Then GetFolderName = fso.GetFolder(normalizedPath).Name
+    accessError = Err.Number
+    If accessError = 0 Then
+        If Not fso Is Nothing Then
+            GetFolderName = fso.GetFolder(normalizedPath).Name
+            accessError = Err.Number
+        End If
+    End If
     On Error GoTo 0
+    If accessError = 18 Then Err.Raise 18
 
     ' Сетевой путь WebDAV может быть недоступен уже при определении имени листа.
     ' Использует последний фрагмент пути, чтобы последующая проверка записала реальную ошибку доступа.
