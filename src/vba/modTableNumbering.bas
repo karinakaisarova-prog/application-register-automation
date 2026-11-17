@@ -105,7 +105,10 @@ Public Sub CheckAndNumberWordTables()
         hasSeq = HasTableSequenceField(wdDoc, tbl.Range.Start)
 
         On Error Resume Next
+        Err.Clear
         pageNo = tbl.Range.Information(3) ' wdActiveEndPageNumber
+        If Err.Number = 18 Then GoTo Failed
+        Err.Clear
         On Error GoTo Failed
 
         ws.Cells(r, 1).Value = r - FIRST_DATA_ROW + 1
@@ -217,7 +220,10 @@ Public Sub CheckAndNumberWordTables()
         captionText = GetPreviousCaptionText(wdDoc, tbl.Range.Start)
         hasSeq = HasTableSequenceField(wdDoc, tbl.Range.Start)
         On Error Resume Next
+        Err.Clear
         pageNo = tbl.Range.Information(3)
+        If Err.Number = 18 Then GoTo Failed
+        Err.Clear
         On Error GoTo Failed
 
         finalWs.Cells(r, 1).Value = r - FIRST_DATA_ROW + 1
