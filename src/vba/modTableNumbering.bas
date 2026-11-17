@@ -547,6 +547,7 @@ Private Sub ConvertManualTableCaptionToSequence(ByVal wdDoc As Object, ByVal tbl
     Dim fld As Object
     Dim captionText As String
     Dim prefixLength As Long
+    Dim leadingLength As Long
     Dim tableStart As Long
 
     tableStart = tbl.Range.Start
@@ -559,15 +560,20 @@ Private Sub ConvertManualTableCaptionToSequence(ByVal wdDoc As Object, ByVal tbl
     captionText = Replace(CStr(captionPara.Text), vbCr, "")
     captionText = Replace(captionText, Chr$(7), "")
     captionText = Replace(captionText, ChrW(160), " ")
+    Do While leadingLength < Len(captionText) And _
+        (Mid$(captionText, leadingLength + 1, 1) = " " Or Mid$(captionText, leadingLength + 1, 1) = vbTab)
+        leadingLength = leadingLength + 1
+    Loop
     prefixLength = GetManualCaptionPrefixLength(captionText)
     If prefixLength = 0 Then
         Err.Raise vbObjectError + 714, "ConvertManualTableCaptionToSequence", _
                   "Не удалось определить номер в существующей подписи таблицы."
     End If
 
-    Set prefixRange = wdDoc.Range(captionPara.Start, captionPara.Start + prefixLength)
+    Set prefixRange = wdDoc.Range(captionPara.Start + leadingLength, _
+                                  captionPara.Start + leadingLength + prefixLength)
     prefixRange.Text = ""
-    Set insertRange = wdDoc.Range(captionPara.Start, captionPara.Start)
+    Set insertRange = wdDoc.Range(captionPara.Start + leadingLength, captionPara.Start + leadingLength)
     Set fld = wdDoc.Fields.Add(insertRange, WD_FIELD_SEQUENCE, "Таблица", False)
     fld.Code.Text = " SEQ Таблица \# ""'Таблица № '0'"" "
     fld.Update
