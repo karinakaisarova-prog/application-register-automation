@@ -348,7 +348,7 @@ FolderError:
 End Sub
 
 Private Function IsSupportedExtension(ByVal ext As String) As Boolean
-    IsSupportedExtension = (ext = "doc" Or ext = "docx" Or ext = "pdf" Or _
+    IsSupportedExtension = (ext = "doc" Or ext = "docx" Or ext = "docm" Or ext = "pdf" Or _
                             ext = "xls" Or ext = "xlsx" Or ext = "xlsm" Or ext = "xlsb")
 End Function
 
