@@ -529,7 +529,7 @@ Private Function NormalizeFilePath(ByVal value As String) As String
             value = "\\" & value
         End If
     End If
-    value = Replace(value, "%20", " ")
+    value = DecodeUrlPath(value)
     value = Replace(value, "/", "\")
     NormalizeFilePath = LCase$(value)
 End Function
@@ -850,7 +850,7 @@ Private Function NormalizeSelectedRootPath(ByVal selectedPath As String) As Stri
     ' Удаляет параметры запроса и фрагмент адреса, если они присутствуют.
     If InStr(urlPath, "?") > 0 Then urlPath = Left$(urlPath, InStr(urlPath, "?") - 1)
     If InStr(urlPath, "#") > 0 Then urlPath = Left$(urlPath, InStr(urlPath, "#") - 1)
-    urlPath = Replace(urlPath, "%20", " ")
+    urlPath = DecodeUrlPath(urlPath)
     urlPath = Replace(urlPath, "/", "\")
 
     serverName = authority
@@ -878,6 +878,101 @@ Private Function NormalizeSelectedRootPath(ByVal selectedPath As String) As Stri
     If Len(urlPath) > 0 Then NormalizeSelectedRootPath = NormalizeSelectedRootPath & "\" & urlPath
 
     LogLine "Адрес SharePoint преобразован в путь Windows WebDAV: " & NormalizeSelectedRootPath
+End Function
+
+Private Function DecodeUrlPath(ByVal value As String) As String
+    Dim result As String
+    Dim i As Long
+    Dim b1 As Long
+    Dim b2 As Long
+    Dim b3 As Long
+    Dim b4 As Long
+    Dim codePoint As Long
+    Dim highSurrogate As Long
+    Dim lowSurrogate As Long
+    Dim sequenceLength As Long
+    Dim decoded As Boolean
+
+    i = 1
+    Do While i <= Len(value)
+        decoded = False
+        If TryReadEncodedByte(value, i, b1) Then
+            If b1 < 128 Then
+                result = result & ChrW$(b1)
+                sequenceLength = 3
+                decoded = True
+            ElseIf b1 >= 194 And b1 <= 223 Then
+                If TryReadEncodedByte(value, i + 3, b2) Then
+                    If b2 >= 128 And b2 <= 191 Then
+                        codePoint = (b1 And 31) * 64 + (b2 And 63)
+                        result = result & ChrW$(codePoint)
+                        sequenceLength = 6
+                        decoded = True
+                    End If
+                End If
+            ElseIf b1 >= 224 And b1 <= 239 Then
+                If TryReadEncodedByte(value, i + 3, b2) And _
+                   TryReadEncodedByte(value, i + 6, b3) Then
+                    If b2 >= 128 And b2 <= 191 And b3 >= 128 And b3 <= 191 Then
+                        codePoint = (b1 And 15) * 4096 + (b2 And 63) * 64 + (b3 And 63)
+                        If codePoint >= 2048 And _
+                           (codePoint < 55296 Or codePoint > 57343) Then
+                            result = result & ChrW$(codePoint)
+                            sequenceLength = 9
+                            decoded = True
+                        End If
+                    End If
+                End If
+            ElseIf b1 >= 240 And b1 <= 244 Then
+                If TryReadEncodedByte(value, i + 3, b2) And _
+                   TryReadEncodedByte(value, i + 6, b3) And _
+                   TryReadEncodedByte(value, i + 9, b4) Then
+                    If b2 >= 128 And b2 <= 191 And _
+                       b3 >= 128 And b3 <= 191 And _
+                       b4 >= 128 And b4 <= 191 Then
+                        codePoint = (b1 And 7) * 262144 + _
+                                    (b2 And 63) * 4096 + _
+                                    (b3 And 63) * 64 + _
+                                    (b4 And 63)
+                        If codePoint >= 65536 And codePoint <= 1114111 Then
+                            codePoint = codePoint - 65536
+                            highSurrogate = 55296 + (codePoint \ 1024)
+                            lowSurrogate = 56320 + (codePoint Mod 1024)
+                            result = result & ChrW$(highSurrogate) & ChrW$(lowSurrogate)
+                            sequenceLength = 12
+                            decoded = True
+                        End If
+                    End If
+                End If
+            End If
+        End If
+
+        If decoded Then
+            i = i + sequenceLength
+        ElseIf Mid$(value, i, 1) = "%" And i + 2 <= Len(value) Then
+            result = result & Mid$(value, i, 3)
+            i = i + 3
+        Else
+            result = result & Mid$(value, i, 1)
+            i = i + 1
+        End If
+    Loop
+
+    DecodeUrlPath = result
+End Function
+
+Private Function TryReadEncodedByte(ByVal value As String, ByVal position As Long, ByRef byteValue As Long) As Boolean
+    Dim hexPair As String
+
+    If position < 1 Or position + 2 > Len(value) Then Exit Function
+    If Mid$(value, position, 1) <> "%" Then Exit Function
+
+    hexPair = Mid$(value, position + 1, 2)
+    If InStr(1, "0123456789ABCDEF", UCase$(Left$(hexPair, 1)), vbBinaryCompare) = 0 Then Exit Function
+    If InStr(1, "0123456789ABCDEF", UCase$(Right$(hexPair, 1)), vbBinaryCompare) = 0 Then Exit Function
+
+    byteValue = CLng("&H" & hexPair)
+    TryReadEncodedByte = True
 End Function
 
 Private Function GetFolderName(ByVal folderPath As String) As String
