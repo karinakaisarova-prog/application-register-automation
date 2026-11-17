@@ -21,6 +21,7 @@ Private mSections As Object
 Private mSeenPaths As Object
 Private mLogText As String
 Private mRootPath As String
+Private mCurrentRootIsWebDav As Boolean
 Private mFolderErrorCount As Long
 
 Public Sub CreateMultiFolderApplicationsListCorrected()
@@ -115,6 +116,7 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
     mSeenPaths.CompareMode = vbTextCompare
     For Each rootItem In roots
         mRootPath = CStr(rootItem)
+        mCurrentRootIsWebDav = (InStr(1, mRootPath, "\\DavWWWRoot", vbTextCompare) > 0)
         LogLine "Поиск файлов: " & mRootPath
         CollectFiles mRootPath, mRootPath, 0
     Next rootItem
@@ -336,9 +338,8 @@ FolderError:
     End If
     mFolderErrorCount = mFolderErrorCount + 1
     LogLine "ОШИБКА ЧТЕНИЯ ПАПКИ: " & currentPath & " (ошибка " & Err.Number & ": " & Err.Description & ")"
-    If InStr(1, currentPath, "http://", vbTextCompare) = 1 Or _
-       InStr(1, currentPath, "https://", vbTextCompare) = 1 Then
-        LogLine "Подсказка: VBA FileSystemObject не выполняет вход в SharePoint по веб-ссылке. Используйте локальную синхронизированную папку OneDrive либо доступный Windows WebDAV-путь."
+    If mCurrentRootIsWebDav Then
+        LogLine "Подсказка: это WebDAV-путь. Проверьте службу WebClient Windows, подключение к серверу, авторизацию и права доступа. Если путь не открывается в Проводнике, выберите синхронизированную папку SharePoint."
     ElseIf Left$(currentPath, 2) = "\\" Then
         LogLine "Подсказка: проверьте доступ к сетевой папке и права чтения."
     Else
