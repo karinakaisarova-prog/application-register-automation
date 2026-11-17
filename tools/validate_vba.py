@@ -251,6 +251,8 @@ if list_module.exists():
         'urlPath = Replace(urlPath, "/", "\\")',
         'NormalizeSelectedRootPath = "\\\\" & webDavServer & "\\DavWWWRoot"',
         'NormalizeSelectedRootPath = NormalizeSelectedRootPath & "\\" & urlPath',
+        'If delimiter = "/" Or delimiter = "?" Or delimiter = "#" Then',
+        'If delimiter = "/" Then',
         'If Len(GetFolderName) = 0 Then',
     )
     for fragment in sharepoint_guards:
