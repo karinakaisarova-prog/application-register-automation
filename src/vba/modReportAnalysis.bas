@@ -64,7 +64,7 @@ Public Sub ScanWordReportMentions()
         .Title = "Выберите основной Word-отчёт"
         .AllowMultiSelect = False
         .Filters.Clear
-        .Filters.Add "Документы Word", "*.doc;*.docx"
+        .Filters.Add "Документы Word", "*.doc;*.docx;*.docm"
         If .Show <> -1 Then GoTo CleanExit
         reportPath = .SelectedItems(1)
     End With
@@ -286,7 +286,7 @@ Public Sub CountPagesForRegister()
             pages = Empty
             On Error GoTo FileFailed
             Select Case ext
-                Case "doc", "docx"
+                Case "doc", "docx", "docm"
                     If wdApp Is Nothing Then Set wdApp = CreateObject("Word.Application")
                     wdApp.Visible = False
                     Set wdDoc = wdApp.Documents.Open(filePath, False, True, False)
