@@ -14,9 +14,7 @@ Public Sub StartRegisterAutomation()
     On Error GoTo Failed
 
     Set sourceWb = ThisWorkbook
-    On Error Resume Next
-    Set sourceData = sourceWb.Worksheets("data")
-    On Error GoTo Failed
+    Set sourceData = TryGetWorksheet(sourceWb, "data")
 
     If sourceData Is Nothing Then
         MsgBox "В этой книге не найден лист с точным именем 'data'." & vbCrLf & _
@@ -40,49 +38,37 @@ Failed:
     failureNumber = Err.Number
     failureDescription = Err.Description
     On Error GoTo 0
-    MsgBox "Не удалось запустить формирование перечня." & vbCrLf & _
-           "Ошибка " & failureNumber & ": " & failureDescription, _
-           vbExclamation, "Автоматизация перечня"
+    If failureNumber = 18 Then
+        MsgBox "Операция отменена.", vbInformation, "Автоматизация перечня"
+    Else
+        MsgBox "Не удалось запустить формирование перечня." & vbCrLf & _
+               "Ошибка " & failureNumber & ": " & failureDescription, _
+               vbExclamation, "Автоматизация перечня"
+    End If
 End Sub
 
 Public Function GetRegisterWorkbook() As Workbook
     Dim wb As Workbook
     Dim ws As Worksheet
 
-    ' В первую очередь использует книгу, явно выбранную процедурой запуска.
-    On Error Resume Next
-    Err.Clear
     If Not gRegisterWorkbook Is Nothing Then
-        Set ws = Nothing
-        Set ws = gRegisterWorkbook.Worksheets("data")
-        If Err.Number = 0 And Not ws Is Nothing Then
+        Set ws = TryGetWorksheet(gRegisterWorkbook, "data")
+        If Not ws Is Nothing Then
             Set GetRegisterWorkbook = gRegisterWorkbook
             Exit Function
         End If
-        Err.Clear
         Set gRegisterWorkbook = Nothing
     End If
-    Err.Clear
-    On Error GoTo 0
 
-    ' При прямом запуске макроса в первую очередь использует ThisWorkbook, если в ней есть исходные данные.
-    Set ws = Nothing
-    On Error Resume Next
-    Set ws = ThisWorkbook.Worksheets("data")
-    On Error GoTo 0
+    Set ws = TryGetWorksheet(ThisWorkbook, "data")
     If Not ws Is Nothing Then
         Set gRegisterWorkbook = ThisWorkbook
         Set GetRegisterWorkbook = ThisWorkbook
         Exit Function
     End If
 
-    ' При прямом запуске активной может быть книга с данными, а
-    ' ThisWorkbook — указывать на PERSONAL.XLSB или другую книгу с макросами.
-    Set ws = Nothing
     If Not ActiveWorkbook Is Nothing Then
-        On Error Resume Next
-        Set ws = ActiveWorkbook.Worksheets("data")
-        On Error GoTo 0
+        Set ws = TryGetWorksheet(ActiveWorkbook, "data")
         If Not ws Is Nothing Then
             Set gRegisterWorkbook = ActiveWorkbook
             Set GetRegisterWorkbook = ActiveWorkbook
@@ -90,13 +76,8 @@ Public Function GetRegisterWorkbook() As Workbook
         End If
     End If
 
-    ' Сначала ищет лист data во всех открытых книгах и только потом использует
-    ' книгу, определённую по ранее созданному перечню.
     For Each wb In Application.Workbooks
-        Set ws = Nothing
-        On Error Resume Next
-        Set ws = wb.Worksheets("data")
-        On Error GoTo 0
+        Set ws = TryGetWorksheet(wb, "data")
         If Not ws Is Nothing Then
             Set gRegisterWorkbook = wb
             Set GetRegisterWorkbook = wb
@@ -104,7 +85,6 @@ Public Function GetRegisterWorkbook() As Workbook
         End If
     Next wb
 
-    ' Последний вариант после сброса VBA — найти книгу с уже созданным перечнем.
     For Each wb In Application.Workbooks
         For Each ws In wb.Worksheets
             If CStr(ws.Range("A1").Value) = "Перечень приложений" Or _
@@ -118,6 +98,20 @@ Public Function GetRegisterWorkbook() As Workbook
 
     Err.Raise vbObjectError + 2101, "GetRegisterWorkbook", _
               "Не удалось определить книгу для перечня. Откройте книгу с листом 'data' и запустите макрос из неё."
+End Function
+
+Private Function TryGetWorksheet(ByVal wb As Workbook, ByVal sheetName As String) As Worksheet
+    Dim lookupError As Long
+
+    If wb Is Nothing Then Exit Function
+
+    On Error Resume Next
+    Err.Clear
+    Set TryGetWorksheet = wb.Worksheets(sheetName)
+    lookupError = Err.Number
+    On Error GoTo 0
+
+    If lookupError = 18 Then Err.Raise 18
 End Function
 
 Public Function GetActiveRegisterSheet() As Worksheet
