@@ -276,6 +276,11 @@ Public Sub CountPagesForRegister()
     For r = 3 To lastRow
         DoEvents
         filePath = GetRegisterPath(ws.Cells(r, 7))
+        If IsWebAddress(filePath) Then
+            ws.Cells(r, 10).Value = "SharePoint: используйте синхронизированную папку"
+            failed = failed + 1
+            GoTo NextRow
+        End If
         If Len(filePath) > 0 And Len(Dir$(filePath)) > 0 Then
             ext = GetFileExtensionFromPath(filePath)
             pages = Empty
@@ -465,10 +470,23 @@ End Function
 
 Private Function NormalizeReportPath(ByVal value As String) As String
     value = Trim$(value)
-    If LCase$(Left$(value, 8)) = "file:///" Then value = Mid$(value, 9)
+    If IsWebAddress(value) Then
+        NormalizeReportPath = value
+        Exit Function
+    End If
+    If LCase$(Left$(value, 8)) = "file:///" Then
+        value = Mid$(value, 9)
+    ElseIf LCase$(Left$(value, 7)) = "file://" Then
+        value = "\\" & Mid$(value, 8)
+    End If
     value = Replace(value, "%20", " ")
     value = Replace(value, "/", "\")
     NormalizeReportPath = value
+End Function
+
+Private Function IsWebAddress(ByVal value As String) As Boolean
+    value = LCase$(Trim$(value))
+    IsWebAddress = (Left$(value, 7) = "http://" Or Left$(value, 8) = "https://")
 End Function
 
 Private Function GetUniqueMentionRecoveryName() As String
