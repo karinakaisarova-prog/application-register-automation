@@ -411,11 +411,13 @@ Private Function GetCaptionParagraphBeforeTable(ByVal wdDoc As Object, ByVal tab
     For paraIndex = wdDoc.Paragraphs.Count To 1 Step -1
         Set para = wdDoc.Paragraphs(paraIndex).Range
         If para.Start < tableStart And para.End <= tableStart Then
-            txt = Replace(CStr(para.Text), vbCr, "")
-            txt = Replace(txt, Chr$(7), "")
-            If Len(Trim$(txt)) > 0 Then
-                Set GetCaptionParagraphBeforeTable = para
-                Exit Function
+            If para.Information(WD_WITHIN_TABLE) = False Then
+                txt = Replace(CStr(para.Text), vbCr, "")
+                txt = Replace(txt, Chr$(7), "")
+                If Len(Trim$(txt)) > 0 Then
+                    Set GetCaptionParagraphBeforeTable = para
+                    Exit Function
+                End If
             End If
         End If
     Next paraIndex
