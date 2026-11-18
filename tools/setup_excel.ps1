@@ -113,7 +113,19 @@ try {
             }
         }
         $fullPath = Join-Path $vbaDir $name
-        $null = $vbProject.VBComponents.Import($fullPath)
+        # Редактор VBA читает .bas только в кодировке Windows (на русской Windows — 1251),
+        # а файлы в репозитории хранятся в UTF-8. Без перекодировки вся кириллица
+        # в коде (формулы, тексты, поисковые шаблоны) превратилась бы в «кракозябры».
+        $importPath = Join-Path $env:TEMP ("ara_import_" + $name)
+        $moduleText = [IO.File]::ReadAllText($fullPath, [Text.Encoding]::UTF8)
+        $moduleText = $moduleText -replace "`r?`n", "`r`n"
+        [IO.File]::WriteAllText($importPath, $moduleText, [Text.Encoding]::GetEncoding(1251))
+        try {
+            $null = $vbProject.VBComponents.Import($importPath)
+        }
+        finally {
+            Remove-Item -LiteralPath $importPath -ErrorAction SilentlyContinue
+        }
         Write-Host ("Добавлен модуль: " + $name)
     }
 

@@ -39,6 +39,8 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
     Dim oldCancelKey As XlEnableCancelKey
     Dim damagedWs As Worksheet
     Dim recoverySheetName As String
+    Dim sourceChoice As VbMsgBoxResult
+    Dim createdNewSheet As Boolean
 
     oldScreenUpdating = Application.ScreenUpdating
     oldEnableEvents = Application.EnableEvents
@@ -57,25 +59,38 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
     mFolderErrorCount = 0
 
     Set roots = New Collection
-    If MsgBox("Выберите способ указания исходной папки:" & vbCrLf & vbCrLf & _
+    sourceChoice = MsgBox("Выберите способ указания исходной папки:" & vbCrLf & vbCrLf & _
               "Да — выбрать одну или несколько папок через Проводник Windows." & vbCrLf & _
               "Нет — вставить веб-адрес папки SharePoint." & vbCrLf & _
               "Отмена — выйти без изменений.", _
-              vbYesNoCancel + vbQuestion + vbDefaultButton1, "Выбор исходной папки") = vbYes Then
-        Set dlg = Application.FileDialog(msoFileDialogFolderPicker)
-        With dlg
-            .Title = "Выберите одну или несколько исходных папок"
-            .AllowMultiSelect = True
-            If .Show <> -1 Then GoTo CleanExit
-            For Each rootItem In .SelectedItems
-                roots.Add NormalizeSelectedRootPath(CStr(rootItem))
-            Next rootItem
-        End With
+              vbYesNoCancel + vbQuestion + vbDefaultButton1, "Выбор исходной папки")
+    If sourceChoice = vbCancel Then GoTo CleanExit
+    If sourceChoice = vbYes Then
+        ' Окно выбора папки Windows позволяет выбрать только одну папку -
+        ' поэтому папки выбираются по очереди.
+        Do
+            Set dlg = Application.FileDialog(msoFileDialogFolderPicker)
+            With dlg
+                .Title = "Выберите исходную папку (" & (roots.Count + 1) & ")"
+                .AllowMultiSelect = False
+                If .Show <> -1 Then Exit Do
+                roots.Add NormalizeSelectedRootPath(CStr(.SelectedItems(1)))
+            End With
+        Loop While MsgBox("Выбрано папок: " & roots.Count & "." & vbCrLf & "Добавить ещё одну папку?", _
+                          vbYesNo + vbQuestion + vbDefaultButton2, "Выбор исходной папки") = vbYes
+        If roots.Count = 0 Then GoTo CleanExit
     Else
         Dim sharePointUrl As String
         sharePointUrl = Trim$(InputBox("Вставьте полный адрес папки SharePoint, начиная с http:// или https://", _
                                        "Адрес папки SharePoint"))
         If Len(sharePointUrl) = 0 Then GoTo CleanExit
+        ' Окно ввода возвращает не больше ~254 символов: длинный адрес молча обрезается
+        If Len(sharePointUrl) >= 254 Then
+            MsgBox "Адрес слишком длинный: окно ввода обрезает его." & vbCrLf & _
+                   "Выберите синхронизированную папку SharePoint через Проводник (кнопка «Да»).", _
+                   vbExclamation, "Слишком длинный адрес"
+            GoTo CleanExit
+        End If
         If LCase$(Left$(sharePointUrl, 7)) <> "http://" And _
            LCase$(Left$(sharePointUrl, 8)) <> "https://" Then
             MsgBox "Укажите полный веб-адрес, начинающийся с http:// или https://.", vbExclamation, "Неверный адрес"
@@ -102,6 +117,15 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
             Exit For
         End If
     Next candidateWs
+    If Not ws Is Nothing Then
+        If Not IsRegisterSheet(ws) Then
+            ' Лист с таким именем есть, но это не перечень (свой лист пользователя,
+            ' журнал и т.п.) - его не трогаем, перечень получает другое имя.
+            LogApplicationsListLine "Лист «" & ws.Name & "» не является перечнем и не изменён."
+            Set ws = Nothing
+            sheetName = GetUniqueListSheetName(sheetName)
+        End If
+    End If
     targetWasExisting = Not ws Is Nothing
     originalSheetName = sheetName
     If targetWasExisting Then
@@ -151,7 +175,10 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
         GoTo CleanExit
     End If
 
-    If ws Is Nothing Then Set ws = GetOrCreateSheet(sheetName)
+    If ws Is Nothing Then
+        Set ws = GetOrCreateSheet(sheetName)
+        createdNewSheet = True
+    End If
     rebuildStarted = True
     BuildOutputSheet ws, mFiles, mSections
     CheckDuplicateApplicationNumbers ws
@@ -228,7 +255,7 @@ Failed:
                 End If
             End If
         End If
-    ElseIf Not targetWasExisting And Len(Trim$(sheetName)) > 0 Then
+    ElseIf createdNewSheet And Len(Trim$(sheetName)) > 0 Then
         Set ws = Nothing
         Set ws = GetRegisterWorkbook().Worksheets(sheetName)
         If Not ws Is Nothing Then ws.Delete
@@ -314,7 +341,10 @@ Private Sub CollectFiles(ByVal rootPath As String, ByVal currentPath As String, 
         DoEvents
         Application.StatusBar = "Проверка файла: " & CStr(fileItem.Name)
         ext = LCase$(fso.GetExtensionName(fileItem.Name))
-        If IsSupportedExtension(ext) Then
+        If IsSkippedFile(fileItem) Then
+            ' «~$…» - временный файл открытого документа Office, скрытые файлы,
+            ' книга самого перечня - в перечень не попадают
+        ElseIf IsSupportedExtension(ext) Then
             If Not mSeenPaths.Exists(CStr(fileItem.Path)) Then
                 mSeenPaths.Add CStr(fileItem.Path), True
                 Set info = ParseFileName(CStr(fileItem.Name))
@@ -342,6 +372,9 @@ Private Sub CollectFiles(ByVal rootPath As String, ByVal currentPath As String, 
             Application.StatusBar = "Обработка папки: " & CStr(subFolder.Path)
             CollectFiles rootPath, CStr(subFolder.Path), depth + 1
         Next subFolder
+    ElseIf folder.SubFolders.Count > 0 Then
+        mFolderErrorCount = mFolderErrorCount + 1
+        LogApplicationsListLine "НЕ ПРОСМОТРЕНЫ вложенные папки глубже " & MAX_FOLDER_DEPTH & " уровней: " & currentPath
     End If
     Exit Sub
 
@@ -520,7 +553,7 @@ End Sub
 Private Function GetCellLinkPath(ByVal c As Range) As String
     On Error GoTo ReadFailed
     If c.Hyperlinks.Count > 0 Then
-        GetCellLinkPath = Trim$(CStr(c.Hyperlinks(1).Address))
+        GetCellLinkPath = ResolveLinkPath(Trim$(CStr(c.Hyperlinks(1).Address)), c.Worksheet.Parent)
     Else
         GetCellLinkPath = Trim$(CStr(c.Value))
     End If
@@ -713,9 +746,9 @@ Private Sub ApplyLookups(ByVal ws As Worksheet)
         ' Точное имя исходного файла уже проверено при создании строки.
         ' Сохраняем предусмотренное для него тире и не определяем это по общему заголовку.
         If Trim$(CStr(ws.Cells(r, 5).Value)) <> "—" Then
-            ws.Cells(r, 5).FormulaLocal = "=ЕСЛИОШИБКА(ИНДЕКС(data!$B:$B;ПОИСКПОЗ($D" & r & ";data!$A:$A;0));"""")"
+            ws.Cells(r, 5).Formula = "=IFERROR(INDEX(data!$B:$B,MATCH($D" & r & ",data!$A:$A,0)),"""")"
         End If
-        ws.Cells(r, 6).FormulaLocal = "=ЕСЛИОШИБКА(ИНДЕКС(data!$C:$F;ПОИСКПОЗ($D" & r & ";data!$A:$A;0);ПОИСКПОЗ($B" & r & ";data!$C$1:$F$1;0));"""")"
+        ws.Cells(r, 6).Formula = "=IFERROR(INDEX(data!$C:$F,MATCH($D" & r & ",data!$A:$A,0),MATCH($B" & r & ",data!$C$1:$F$1,0)),"""")"
     Next r
 End Sub
 
@@ -1082,3 +1115,33 @@ Private Sub LogApplicationsListLine(ByVal message As String)
     Application.StatusBar = message
     DoEvents
 End Sub
+
+' Файлы, которые не попадают в перечень
+Private Function IsSkippedFile(ByVal fileItem As Object) As Boolean
+    Dim registerPath As String
+    On Error Resume Next
+    If Left$(CStr(fileItem.Name), 2) = "~$" Then IsSkippedFile = True: Exit Function
+    If (fileItem.Attributes And 2) <> 0 Then IsSkippedFile = True: Exit Function   ' скрытый
+    registerPath = GetRegisterWorkbook().FullName
+    If Len(registerPath) > 0 Then
+        If StrComp(CStr(fileItem.Path), registerPath, vbTextCompare) = 0 Then IsSkippedFile = True
+    End If
+    If Err.Number = 18 Then
+        On Error GoTo 0
+        Err.Raise 18
+    End If
+    Err.Clear
+End Function
+
+' Свободное имя листа: «Имя (2)», «Имя (3)»… не длиннее 31 символа
+Private Function GetUniqueListSheetName(ByVal baseName As String) As String
+    Dim candidate As String
+    Dim suffix As Long
+    suffix = 2
+    Do
+        candidate = Left$(baseName, 31 - Len(" (" & suffix & ")")) & " (" & suffix & ")"
+        If Not WorksheetExists(candidate) Then Exit Do
+        suffix = suffix + 1
+    Loop
+    GetUniqueListSheetName = candidate
+End Function

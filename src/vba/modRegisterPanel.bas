@@ -37,7 +37,8 @@ Public Sub AddRegisterControlPanel()
 WorkbookNotFound:
     If Err.Number = 18 Then
         On Error GoTo 0
-        Err.Raise 18
+        MsgBox "Операция отменена.", vbInformation, "Панель макросов"
+        Exit Sub
     End If
     failureNumber = Err.Number
     failureDescription = Err.Description
@@ -50,7 +51,8 @@ WorkbookNotFound:
 PanelFailed:
     If Err.Number = 18 Then
         On Error GoTo 0
-        Err.Raise 18
+        MsgBox "Операция отменена.", vbInformation, "Панель макросов"
+        Exit Sub
     End If
     failureNumber = Err.Number
     failureDescription = Err.Description

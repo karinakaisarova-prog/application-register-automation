@@ -246,7 +246,7 @@ if list_module.exists():
 if list_module.exists():
     sharepoint_source = list_module.read_text(encoding='utf-8-sig')
     sharepoint_guards = (
-        'roots.Add NormalizeSelectedRootPath(CStr(rootItem))',
+        'roots.Add NormalizeSelectedRootPath(CStr(.SelectedItems(1)))',
         'Private Function NormalizeSelectedRootPath(ByVal selectedPath As String) As String',
         'urlPath = Replace(urlPath, "/", "\\")',
         'NormalizeSelectedRootPath = "\\\\" & webDavServer & "\\DavWWWRoot"',
@@ -470,18 +470,19 @@ table_module = root / 'src' / 'vba' / 'modTableNumbering.bas'
 if table_module.exists():
     table_source = table_module.read_text(encoding='utf-8-sig')
     caption_match = re.search(
-        r'Private Function HasTableSequenceField\b(.*?)^End Function\s*$',
+        r'Private Function ClassifyTableCaption\b(.*?)^End Function\s*$',
         table_source, re.I | re.M | re.S
     )
     if not caption_match:
-        errors.append('modTableNumbering.bas: HasTableSequenceField function not found')
+        errors.append('modTableNumbering.bas: ClassifyTableCaption function not found')
     else:
         caption_code = caption_match.group(1)
         for fragment in (
-            'Left$(trimmedText, Len("Таблица"))',
+            'Left$(captionText, Len("Таблица"))',
             'StrComp(',
             'For Each fld In para.Fields',
-            'If Len(trimmedText) > 0 Then',
+            'CAP_HAS_SEQ',
+            'CAP_MANUAL',
         ):
             if fragment not in caption_code:
                 errors.append('modTableNumbering.bas: caption recognition guard missing: ' + fragment)
@@ -489,13 +490,12 @@ if table_module.exists():
 # Итоговый отчёт проверки таблиц Word должен быть полностью сформирован на временном листе до замены предварительного отчёта.
 if table_module.exists():
     final_report_guards = (
-        'Set finalWs = GetRegisterWorkbook().Worksheets.Add',
+        'Set finalWs = registerWb.Worksheets.Add',
         'FormatTableReport finalWs, r - 1',
         'ws.Name = finalOldName',
         'finalWs.Name = TABLE_REPORT_SHEET',
         'FinalReportCommitFailed:',
         'If Not finalWs Is Nothing Then',
-        'Удаление старого предварительного отчёта — завершающая очистка',
         'If Err.Number = 0 Then',
     )
     for fragment in final_report_guards:
@@ -505,18 +505,30 @@ if table_module.exists():
 # Проверяет, что существующая текстовая подпись преобразуется в SEQ без потери названия.
 if table_module.exists():
     for fragment in (
-        'Private Function IsTableCaptionText(',
+        'Private Function ClassifyTableCaption(',
         'manualCaptionCount = manualCaptionCount + 1',
-        'If IsTableCaptionText(captionText) Then',
+        'Case CAP_CONVERT',
         'ConvertManualTableCaptionToSequence wdDoc, tbl',
         'GetManualCaptionPrefixLength(captionText)',
         'prefixRange.Text = ""',
-        'fld.Code.Text = " SEQ Таблица \\# ""\'Таблица № \'0\'"" "',
-        'para.Information(WD_WITHIN_TABLE) = False',
-        'If Not HasTableSequenceField(wdDoc, tbl.Range.Start) Then',
+        'fld.Code.Text = SEQ_FIELD_CODE',
+        # поиск подписи не должен «перепрыгивать» через предыдущую таблицу
+        'If p.Range.Information(WD_WITHIN_TABLE) Then Exit Do',
     ):
         if fragment not in table_source:
             errors.append('modTableNumbering.bas: manual-caption conversion guard missing: ' + fragment)
+    # Формат номера: в строке «\# "'Таблица № '0"» апострофы парные. Лишний апостроф
+    # после 0 давал в каждой подписи «Ошибка! Строка шаблона содержит непарные кавычки».
+    seq_const = re.search(r'Private Const SEQ_FIELD_CODE As String = "(.*)"\s*$', table_source, re.M)
+    if not seq_const:
+        errors.append('modTableNumbering.bas: SEQ_FIELD_CODE constant not found')
+    else:
+        picture = re.search(r'\\# ""(.*?)""', seq_const.group(1))
+        if not picture or picture.group(1).count("'") % 2 != 0:
+            errors.append('modTableNumbering.bas: SEQ number format has unpaired apostrophes')
+    # Название подписи хранится в Word (Application), у документа CaptionLabels нет (ошибка 438).
+    if re.search(r'wdDoc\.CaptionLabels', table_source):
+        errors.append('modTableNumbering.bas: CaptionLabels must be used on the Word application, not the document')
 
 # Проверяет текущую схему работы в одной книге. Макрос запуска должен
 # проверить наличие нужного листа data, назначить рабочую книгу и
@@ -653,8 +665,10 @@ for module_name, function_prefix, log_prefix in (
             'FileCopy reportPath, backupPath',
             'changesStarted = True',
             'If changesStarted And Len(backupPath) > 0 Then',
-            'If Not wdDoc Is Nothing Then wdDoc.Close False',
-            'If Not wdApp Is Nothing Then wdApp.Quit',
+            # закрытие без сохранения и выход из Word без вопросов (0 = wdDoNotSaveChanges)
+            'If Not wdDoc Is Nothing Then wdDoc.Close 0',
+            'wdApp.Quit 0',
+            'wdApp.DisplayAlerts = ',
             'fsoRestore.CopyFile backupPath, reportPath, True',
             'Автовосстановление не удалось. Резервная копия сохранена:',
             'Application.EnableCancelKey = oldCancelKey',
@@ -664,10 +678,64 @@ for module_name, function_prefix, log_prefix in (
                 errors.append(f'{module_name}: Word backup/recovery guard missing: {fragment}')
         backup_pos = module_source.find('FileCopy reportPath, backupPath')
         change_pos = module_source.find('changesStarted = True', backup_pos)
-        first_edit_pos = module_source.find('EnsureTableCaptionLabel wdDoc') if module_name == 'modTableNumbering.bas' else module_source.find('wordRange.Delete')
+        first_edit_pos = module_source.find('EnsureTableCaptionLabel wdApp') if module_name == 'modTableNumbering.bas' else module_source.find('wordRange.Delete')
         if backup_pos < 0 or change_pos < backup_pos or first_edit_pos < 0 or backup_pos > first_edit_pos:
             # Изменение маркированного списка выполняется в следующем цикле; резервная копия должна быть создана до первого удаления.
             errors.append(f'{module_name}: backup must be created before document edits')
+
+# Вызов процедуры, которой нет ни в одном модуле src/vba, - ошибка компиляции
+# «Sub or Function not defined» для всего проекта (так было с LogRestoreIssue).
+VBA_STATEMENTS = {
+    'call', 'set', 'let', 'dim', 'redim', 'private', 'public', 'const', 'if', 'elseif', 'else', 'end', 'for',
+    'next', 'do', 'loop', 'while', 'wend', 'with', 'select', 'case', 'exit', 'goto', 'on', 'resume', 'option',
+    'attribute', 'sub', 'function', 'property', 'msgbox', 'debug', 'err', 'erase', 'name', 'kill', 'filecopy',
+    'mkdir', 'rmdir', 'chdir', 'open', 'close', 'print', 'write', 'input', 'line', 'get', 'put', 'seek',
+    'doevents', 'beep', 'stop', 'randomize', 'application', 'activesheet', 'activeworkbook', 'thisworkbook',
+    'workbooks', 'worksheets', 'sheets', 'range', 'cells', 'columns', 'rows', 'not', 'static', 'type', 'enum',
+    'friend', 'global', 'implements', 'event', 'raiseevent', 'declare', 'defint', 'deflng', 'defstr',
+}
+defined = {name for name in seen}
+local_names = set()
+for path in modules:
+    text = path.read_text(encoding='utf-8-sig')
+    for m in re.finditer(r'\b(?:Dim|Private|Public|Const|ReDim|Static)\s+(?:Preserve\s+)?([A-Za-z_][A-Za-z0-9_]*)', text, re.I):
+        local_names.add(m.group(1).lower())
+    for m in re.finditer(r'(?:ByVal|ByRef|Optional|,|\()\s*([A-Za-z_][A-Za-z0-9_]*)\s+As\b', text, re.I):
+        local_names.add(m.group(1).lower())
+def logical_lines(text):
+    # склеивает строки, перенесённые знаком « _», и убирает строки в кавычках и комментарии
+    buf, start = '', 0
+    for number, raw in enumerate(text.splitlines(), 1):
+        line = re.sub(r'"(?:[^"]|"")*"', '""', raw)
+        line = line.split("'")[0].rstrip()
+        if not buf:
+            start = number
+        if line.endswith(' _'):
+            buf += line[:-2] + ' '
+            continue
+        yield start, (buf + line).strip()
+        buf = ''
+
+
+for path in modules:
+    for number, code in logical_lines(path.read_text(encoding='utf-8-sig')):
+        if not code:
+            continue
+        # оператор-вызов: «Имя аргументы» или «Call Имя(…)», а также «If … Then Имя аргументы»
+        candidates = []
+        m = re.match(r'^(?:Call\s+)?([A-Za-z_][A-Za-z0-9_]*)(?=\s+[^=\s]|\s*$|\()', code)
+        if m and not re.match(r'^[A-Za-z_][A-Za-z0-9_]*\s*(\(.*\))?\s*=', code):
+            candidates.append(m.group(1))
+        m = re.search(r'\bThen\s+(?:Call\s+)?([A-Za-z_][A-Za-z0-9_]*)\s+(?!=)', code)
+        if m and not re.search(r'\bThen\s+[A-Za-z_][A-Za-z0-9_.]*\s*(\(.*?\))?\s*=', code):
+            candidates.append(m.group(1))
+        for name in candidates:
+            low = name.lower()
+            if low in VBA_STATEMENTS or low in defined or low in local_names:
+                continue
+            if code.endswith(':') and re.match(r'^[A-Za-z_][A-Za-z0-9_]*:$', code):
+                continue  # метка
+            errors.append(f'{path.relative_to(root)}:{number}: call to undefined procedure "{name}"')
 
 print(f'Modules scanned: {len(modules)}; procedures/functions: {sum(len(x) for x in seen.values())}')
 if errors:
