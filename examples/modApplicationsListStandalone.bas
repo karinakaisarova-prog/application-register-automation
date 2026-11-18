@@ -823,6 +823,7 @@ Private Function NormalizeSelectedRootPath(ByVal selectedPath As String) As Stri
     Dim serverName As String
     Dim portText As String
     Dim colonPos As Long
+    Dim portNumber As Long
     Dim webDavServer As String
     Dim delimiter As String
     Dim i As Long
@@ -866,17 +867,62 @@ Private Function NormalizeSelectedRootPath(ByVal selectedPath As String) As Stri
     urlPath = DecodeUrlPath(urlPath)
     urlPath = Replace(urlPath, "/", "\")
 
+    If Len(authority) = 0 Then
+        Err.Raise vbObjectError + 2101, "NormalizeSelectedRootPath", _
+                  "В адресе SharePoint не указано имя сервера."
+    End If
+
+    If InStr(1, authority, "[", vbBinaryCompare) > 0 Or _
+       InStr(1, authority, "]", vbBinaryCompare) > 0 Then
+        Err.Raise vbObjectError + 2102, "NormalizeSelectedRootPath", _
+                  "Адреса IPv6 пока не поддерживаются при преобразовании SharePoint в WebDAV."
+    End If
+
     serverName = authority
     portText = ""
-    colonPos = InStrRev(authority, ":")
+    colonPos = InStr(1, authority, ":", vbBinaryCompare)
     If colonPos > 0 Then
+        If InStr(colonPos + 1, authority, ":", vbBinaryCompare) > 0 Then
+            Err.Raise vbObjectError + 2103, "NormalizeSelectedRootPath", _
+                      "В адресе SharePoint обнаружено несколько двоеточий. Проверьте имя сервера и порт."
+        End If
+
         serverName = Left$(authority, colonPos - 1)
         portText = Mid$(authority, colonPos + 1)
+
+        If Len(serverName) = 0 Then
+            Err.Raise vbObjectError + 2104, "NormalizeSelectedRootPath", _
+                      "В адресе SharePoint не указано имя сервера."
+        End If
+
+        If Len(portText) = 0 Then
+            Err.Raise vbObjectError + 2105, "NormalizeSelectedRootPath", _
+                      "После двоеточия в адресе SharePoint не указан порт."
+        End If
+
+        If Len(portText) > 5 Then
+            Err.Raise vbObjectError + 2106, "NormalizeSelectedRootPath", _
+                      "Порт SharePoint должен быть целым числом от 1 до 65535."
+        End If
+
+        For i = 1 To Len(portText)
+            If AscW(Mid$(portText, i, 1)) < 48 Or AscW(Mid$(portText, i, 1)) > 57 Then
+                Err.Raise vbObjectError + 2107, "NormalizeSelectedRootPath", _
+                          "Порт SharePoint должен содержать только цифры."
+            End If
+        Next i
+
+        portNumber = CLng(portText)
+        If portNumber < 1 Or portNumber > 65535 Then
+            Err.Raise vbObjectError + 2108, "NormalizeSelectedRootPath", _
+                      "Порт SharePoint должен быть целым числом от 1 до 65535."
+        End If
+        portText = CStr(portNumber)
     End If
 
     If Len(serverName) = 0 Then
-        NormalizeSelectedRootPath = selectedPath
-        Exit Function
+        Err.Raise vbObjectError + 2109, "NormalizeSelectedRootPath", _
+                  "В адресе SharePoint не указано имя сервера."
     End If
 
     webDavServer = serverName
