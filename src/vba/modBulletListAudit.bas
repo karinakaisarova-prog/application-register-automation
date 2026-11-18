@@ -8,6 +8,8 @@ Option Explicit
 Private Const BULLET_REPORT_SHEET As String = "Проверка списков"
 Private Const FIRST_DATA_ROW As Long = 2
 Private Const WD_LIST_NO_NUMBERING As Long = 0
+Private Const WD_WITHIN_TABLE As Long = 12
+Private Const WD_NO_PROTECTION As Long = -1
 
 Public Sub CheckAndFixWordBulletLists()
    Dim fd As FileDialog
@@ -38,6 +40,9 @@ Public Sub CheckAndFixWordBulletLists()
     Dim stageWs As Worksheet
     Dim stageName As String, priorBackupName As String
     Dim reportCommitted As Boolean, priorRenamed As Boolean
+    Dim paras() As Object
+    Dim oldTrack As Boolean, trackChanged As Boolean
+    Dim restoredOk As Boolean
 
     Dim registerWb As Workbook
 
@@ -71,9 +76,17 @@ Public Sub CheckAndFixWordBulletLists()
         reportPath = .SelectedItems(1)
     End With
 
+    ' Невидимый Word без диалогов и без макросов документа: любое окно
+    ' в невидимом Word заставило бы Excel ждать бесконечно.
     Set wdApp = CreateObject("Word.Application")
     wdApp.Visible = False
-    Set wdDoc = wdApp.Documents.Open(reportPath, False, False, False)
+    wdApp.DisplayAlerts = 0                 ' wdAlertsNone
+    On Error Resume Next
+    wdApp.AutomationSecurity = 3            ' msoAutomationSecurityForceDisable
+    On Error GoTo Failed
+    ' Пароль «#» вместо запроса: документ с паролем даёт ошибку, а не окно в невидимом Word
+    Set wdDoc = wdApp.Documents.Open(FileName:=reportPath, ConfirmConversions:=False, _
+                                     ReadOnly:=False, AddToRecentFiles:=False, PasswordDocument:="#")
 
     ' Сначала формирует отчёт на временном листе, чтобы при прерывании не потерять предыдущий отчёт.
     On Error Resume Next
@@ -83,31 +96,47 @@ Public Sub CheckAndFixWordBulletLists()
     Set stageWs = GetRegisterWorkbook().Worksheets.Add(After:=GetRegisterWorkbook().Worksheets(GetRegisterWorkbook().Worksheets.Count))
     stageWs.Name = stageName
     Set ws = stageWs
+    ws.Columns("C:E").NumberFormat = "@"
     ws.Range("A1:G1").Value = Array("Группа", "Страница", "Текст абзаца", "Найденная маркировка", _
                                     "Предлагаемое действие", "Начальный абзац (служебное)", "Конечный абзац (служебное)")
     rowOut = FIRST_DATA_ROW
     pCount = wdDoc.Paragraphs.Count
+    If pCount > 0 Then ReDim paras(1 To pCount)
+    i = 0
+    For Each para In wdDoc.Paragraphs
+        i = i + 1
+        If i > pCount Then Exit For
+        Set paras(i) = para
+        If (i Mod 500) = 0 Then
+            DoEvents
+            Application.StatusBar = "Чтение абзацев: " & i & " из " & pCount
+        End If
+    Next para
     i = 1
 
     Do While i <= pCount
-        DoEvents
-        Set para = wdDoc.Paragraphs(i)
+        If (i Mod 50) = 0 Then
+            DoEvents
+            Application.StatusBar = "Проверка списков: абзац " & i & " из " & pCount
+        End If
+        Set para = paras(i)
         txt = CleanBulletParagraphText(CStr(para.Range.Text))
         markerOffset = 0
         markerLength = 0
 
-        If Not IsNativeWordList(para) Then
+        ' Ячейки таблиц не объединяются в список: иначе маркеры попали бы в чужие ячейки
+        If Not IsNativeWordList(para) And Not IsInTable(para) Then
             If GetTypedMarker(txt, markerOffset, markerLength) Then
                 runStart = i
                 unsafeGroup = False
                 runIndent = GetBulletIndentLevel(para, txt)
                 j = i
                 Do While j <= pCount
-                    Set para = wdDoc.Paragraphs(j)
+                    Set para = paras(j)
                     txt = CleanBulletParagraphText(CStr(para.Range.Text))
                     markerOffset = 0
                     markerLength = 0
-                    If IsNativeWordList(para) Then Exit Do
+                    If IsNativeWordList(para) Or IsInTable(para) Then Exit Do
                     If Not GetTypedMarker(txt, markerOffset, markerLength) Then Exit Do
                     currentIndent = GetBulletIndentLevel(para, txt)
                     If currentIndent <> runIndent Then unsafeGroup = True
@@ -122,7 +151,7 @@ Public Sub CheckAndFixWordBulletLists()
                     groupNo = groupNo + 1
                     groupsFound = groupsFound + 1
                     For i = runStart To runEnd
-                        Set para = wdDoc.Paragraphs(i)
+                        Set para = paras(i)
                         txt = CleanBulletParagraphText(CStr(para.Range.Text))
                         markerOffset = 0
                         markerLength = 0
@@ -174,7 +203,10 @@ Public Sub CheckAndFixWordBulletLists()
     End If
     Application.DisplayAlerts = oldAlerts
     On Error GoTo Failed
+    On Error Resume Next
+    registerWb.Activate
     ws.Activate
+    On Error GoTo Failed
 
     If unsafeGroupsFound > 0 Then
         MsgBox "Найдены группы ручных маркеров с разными отступами (возможные вложенные пункты): " & unsafeGroupsFound & _
@@ -192,11 +224,27 @@ Public Sub CheckAndFixWordBulletLists()
         GoTo CleanExit
     End If
 
+    ' Изменения возможны только в документе, который можно сохранить.
+    If wdDoc.ReadOnly Then
+        MsgBox "Документ открыт только для чтения (возможно, он открыт в Word у вас или у коллеги)." & vbCrLf & _
+               "Предварительный отчёт сохранён на листе '" & BULLET_REPORT_SHEET & "'. Закройте документ и повторите.", _
+               vbExclamation, "Проверка списков"
+        GoTo CleanExit
+    End If
+    If wdDoc.ProtectionType <> WD_NO_PROTECTION Then
+        MsgBox "Документ защищён от изменений. Снимите защиту и повторите." & vbCrLf & _
+               "Предварительный отчёт сохранён на листе '" & BULLET_REPORT_SHEET & "'.", _
+               vbExclamation, "Проверка списков"
+        GoTo CleanExit
+    End If
+
     answer = MsgBox("Предварительная проверка завершена." & vbCrLf & _
                     "Найдено групп: " & groupsFound & vbCrLf & _
                     "Абзацев-кандидатов: " & paragraphsFound & vbCrLf & vbCrLf & _
                     "Преобразовать эти группы в настоящие маркированные списки Word и сохранить документ?" & _
-                    vbCrLf & "Перед исправлением рекомендуется сделать копию файла.", _
+                    vbCrLf & IIf(wdDoc.Revisions.Count > 0, "В документе есть непринятые исправления: " & _
+                        wdDoc.Revisions.Count & ". Новые правки будут внесены без режима исправлений." & vbCrLf, "") & _
+                    "Перед исправлением будет создана резервная копия.", _
                     vbYesNo + vbQuestion + vbDefaultButton2, "Подтверждение исправлений")
     If answer <> vbYes Then
         MsgBox "Изменения не внесены. Предварительный отчёт сохранён на листе '" & BULLET_REPORT_SHEET & "'.", _
@@ -209,6 +257,12 @@ Public Sub CheckAndFixWordBulletLists()
     FileCopy reportPath, backupPath
     LogBulletBackup ws, backupPath
     changesStarted = True
+
+    ' Режим исправлений выключается на время правок: иначе удалённые маркеры
+    ' остаются в тексте как «исправления», и повторный запуск снова их находит.
+    oldTrack = wdDoc.TrackRevisions
+    wdDoc.TrackRevisions = False
+    trackChanged = True
 
     ' Обрабатывает группы с конца документа, чтобы номера предыдущих абзацев не смещались.
     Dim groupStartRows() As Long, groupEndRows() As Long, groupCount As Long
@@ -235,31 +289,29 @@ Public Sub CheckAndFixWordBulletLists()
         firstP = groupStartRows(g)
         lastP = groupEndRows(g)
         For k = lastP To firstP Step -1
-            Set currentPara = wdDoc.Paragraphs(k)
+            Set currentPara = paras(k)
             rawText = CStr(currentPara.Range.Text)
             offset = 0
             removeLen = 0
             If GetTypedMarker(CleanBulletParagraphText(rawText), offset, removeLen) Then
-                ' Смещение включает начальные пробелы; сохраняет отступ перед маркером.
-                Dim leadingSpaces As Long, cleanText As String
-                cleanText = CleanBulletParagraphText(rawText)
-                leadingSpaces = 0
-                Do While leadingSpaces < Len(cleanText) And _
-                    (Mid$(cleanText, leadingSpaces + 1, 1) = " " Or Mid$(cleanText, leadingSpaces + 1, 1) = vbTab)
-                    leadingSpaces = leadingSpaces + 1
-                Loop
-                Set wordRange = wdDoc.Range(currentPara.Range.Start + leadingSpaces, _
-                                            currentPara.Range.Start + leadingSpaces + removeLen)
+                ' Удаляет и пробелы/табуляции перед маркером: отступ задаёт сам список
+                ' Word, иначе пункты выглядели бы сдвинутыми.
+                Set wordRange = wdDoc.Range(currentPara.Range.Start, _
+                                            currentPara.Range.Start + offset + removeLen)
                 wordRange.Delete
             End If
         Next k
-        Set wordRange = wdDoc.Range(wdDoc.Paragraphs(firstP).Range.Start, wdDoc.Paragraphs(lastP).Range.End)
+        Set wordRange = wdDoc.Range(paras(firstP).Range.Start, paras(lastP).Range.End)
         wordRange.ListFormat.ApplyBulletDefault
         paragraphsFixed = paragraphsFixed + (lastP - firstP + 1)
         Application.StatusBar = "Исправление маркированных списков: группа " & (groupCount - g + 1) & " из " & groupCount
     Next g
 
+    wdDoc.TrackRevisions = oldTrack
+    trackChanged = False
     wdDoc.Save
+    ' Документ сохранён: дальнейшие ошибки в Excel не должны откатывать его к копии.
+    changesStarted = False
     ' Обновляет состояние проверки, сохраняя исходный текст предварительного отчёта.
     ws.Range("E2:E" & rowOut - 1).Value = "Исправлено: применён маркированный список Word"
     MsgBox "Исправление завершено." & vbCrLf & _
@@ -290,8 +342,8 @@ Failed:
     If Err.Number = 18 Then cancelled = True
     If Len(errText) = 0 Then errText = Err.Description
     On Error Resume Next
-    If Not wdDoc Is Nothing Then wdDoc.Close False
-    If Not wdApp Is Nothing Then wdApp.Quit
+    If trackChanged And Not wdDoc Is Nothing Then wdDoc.TrackRevisions = oldTrack
+    CloseBulletWord wdApp, wdDoc
     If Not stageWs Is Nothing Then
         If Not reportCommitted Then
             Application.DisplayAlerts = False
@@ -306,7 +358,8 @@ Failed:
         Err.Clear
         Set fsoRestore = CreateObject("Scripting.FileSystemObject")
         fsoRestore.CopyFile backupPath, reportPath, True
-        If Err.Number = 0 Then
+        restoredOk = (Err.Number = 0)
+        If restoredOk Then
             LogBulletBackup ws, "Исходный файл восстановлен из копии: " & backupPath
         Else
             Err.Clear
@@ -315,17 +368,16 @@ Failed:
     End If
     On Error GoTo 0
     If cancelled Then
-        MsgBox "Операция отменена. Если изменения уже начались, проверьте документ и восстановите копию при необходимости.", _
+        MsgBox "Операция отменена." & BulletRestoreNote(restoredOk, backupPath), _
                vbExclamation, "Проверка списков"
     Else
-        MsgBox "Ошибка при проверке или исправлении маркированных списков: " & errText, _
+        MsgBox "Ошибка при проверке или исправлении маркированных списков: " & errText & BulletRestoreNote(restoredOk, backupPath), _
                vbExclamation, "Проверка списков"
     End If
 
 CleanExit:
     On Error Resume Next
-    If Not wdDoc Is Nothing Then wdDoc.Close False
-    If Not wdApp Is Nothing Then wdApp.Quit
+    CloseBulletWord wdApp, wdDoc
     Application.ScreenUpdating = oldScreen
     Application.EnableEvents = oldEvents
     Application.DisplayAlerts = oldAlerts
@@ -500,3 +552,36 @@ Private Sub FormatBulletReport(ByVal ws As Worksheet, ByVal lastRow As Long)
     ws.Columns("D:E").ColumnWidth = 34
     ws.Columns("F:G").Hidden = True
 End Sub
+
+Private Function IsInTable(ByVal para As Object) As Boolean
+    On Error Resume Next
+    IsInTable = CBool(para.Range.Information(WD_WITHIN_TABLE))
+    If Err.Number = 18 Then
+        On Error GoTo 0
+        Err.Raise 18
+    End If
+    Err.Clear
+End Function
+
+' Закрывает документ без сохранения и выходит из Word, не спрашивая о шаблоне Normal.
+Private Sub CloseBulletWord(ByRef wdApp As Object, ByRef wdDoc As Object)
+    On Error Resume Next
+    If Not wdDoc Is Nothing Then wdDoc.Close 0
+    Set wdDoc = Nothing
+    If Not wdApp Is Nothing Then
+        wdApp.NormalTemplate.Saved = True
+        wdApp.Quit 0
+    End If
+    Set wdApp = Nothing
+End Sub
+
+' Текст для сообщения: восстановлен ли документ из резервной копии
+Private Function BulletRestoreNote(ByVal restoredOk As Boolean, ByVal backupPath As String) As String
+    If Len(backupPath) = 0 Then Exit Function
+    If restoredOk Then
+        BulletRestoreNote = vbCrLf & "Документ восстановлен из резервной копии: " & backupPath
+    Else
+        BulletRestoreNote = vbCrLf & "Документ НЕ восстанавливался (изменения уже сохранены или копия недоступна)." & _
+                            vbCrLf & "Резервная копия: " & backupPath
+    End If
+End Function

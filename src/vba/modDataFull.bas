@@ -93,7 +93,9 @@ Public Sub BuildDataFull()
     ' Сохраняет полную копию листа, пока перестроение не завершится успешно.
     If outputWasExisting Then
         outputWs.Copy After:=GetRegisterWorkbook().Worksheets(GetRegisterWorkbook().Worksheets.Count)
-        Set backupWs = ActiveSheet
+        ' Копию берём по позиции (она последняя): у скрытого листа копия не становится
+        ' активной, и ActiveSheet указал бы на чужой лист, например перечень.
+        Set backupWs = GetRegisterWorkbook().Worksheets(GetRegisterWorkbook().Worksheets.Count)
         backupWs.Name = GetUniqueDataFullBackupName()
         GetRegisterWorkbook().Save
     Else
@@ -101,6 +103,8 @@ Public Sub BuildDataFull()
     End If
 
     outputWs.Cells.Clear
+    ' Текстовый формат: иначе раздел «2.1» или «3.10» Excel превратит в дату
+    outputWs.Range("A:B").NumberFormat = "@"
     outputWs.Range("A1:B1").Value = Array("Раздел", "Ответственное лицо")
     outRow = 2
     For Each item In pairs.Keys
@@ -136,7 +140,7 @@ Public Sub BuildDataFull()
         .WrapText = True
     End With
     outputWs.Columns("A:B").AutoFit
-    outputWs.Activate
+    If outputWs.Visible = xlSheetVisible Then outputWs.Activate
     operationCompleted = True
     If Not backupWs Is Nothing Then
         Application.DisplayAlerts = False

@@ -87,8 +87,8 @@ Public Function GetRegisterWorkbook() As Workbook
 
     For Each wb In Application.Workbooks
         For Each ws In wb.Worksheets
-            If CStr(ws.Range("A1").Value) = "Перечень приложений" Or _
-               CStr(ws.Range("A2").Value) = "№ п/п" Then
+            If CStr(ws.Range("A1").Text) = "Перечень приложений" Or _
+               CStr(ws.Range("A2").Text) = "№ п/п" Then
                 Set gRegisterWorkbook = wb
                 Set GetRegisterWorkbook = wb
                 Exit Function
@@ -124,9 +124,7 @@ Public Function GetActiveRegisterSheet() As Worksheet
     If Not ActiveWorkbook Is Nothing Then
         If ActiveWorkbook Is wb Then
             If TypeName(ActiveSheet) = "Worksheet" Then
-                If Trim$(CStr(ActiveSheet.Cells(2, 1).Value)) = "№ п/п" And _
-                   Trim$(CStr(ActiveSheet.Cells(2, 6).Value)) = "Ответственное лицо" And _
-                   Trim$(CStr(ActiveSheet.Cells(2, 8).Value)) = "Раздел" Then
+                If IsRegisterSheet(ActiveSheet) Then
                     Set GetActiveRegisterSheet = ActiveSheet
                     Exit Function
                 End If
@@ -135,11 +133,48 @@ Public Function GetActiveRegisterSheet() As Worksheet
     End If
 
     For Each ws In wb.Worksheets
-        If Trim$(CStr(ws.Cells(2, 1).Value)) = "№ п/п" And _
-           Trim$(CStr(ws.Cells(2, 6).Value)) = "Ответственное лицо" And _
-           Trim$(CStr(ws.Cells(2, 8).Value)) = "Раздел" Then
+        If IsRegisterSheet(ws) Then
             Set GetActiveRegisterSheet = ws
             Exit Function
         End If
     Next ws
+End Function
+
+' Лист перечня - по заголовкам строки 2. Читается .Text, а не .Value:
+' ячейка с ошибкой формулы (#Н/Д) не должна обрывать поиск.
+Public Function IsRegisterSheet(ByVal ws As Worksheet) As Boolean
+    If ws Is Nothing Then Exit Function
+    IsRegisterSheet = (Trim$(CStr(ws.Cells(2, 1).Text)) = "№ п/п" And _
+                       Trim$(CStr(ws.Cells(2, 6).Text)) = "Ответственное лицо" And _
+                       Trim$(CStr(ws.Cells(2, 8).Text)) = "Раздел")
+End Function
+
+' Полный путь из адреса гиперссылки. После сохранения книги Excel хранит
+' ссылки относительно её папки («Папка\файл.pdf», «..\Документы\файл.pdf»),
+' а макросам нужен полный путь.
+Public Function ResolveLinkPath(ByVal addr As String, ByVal wb As Workbook) As String
+    Dim fso As Object
+    Dim basePath As String
+
+    addr = Trim$(addr)
+    ResolveLinkPath = addr
+    If Len(addr) = 0 Then Exit Function
+    If addr Like "[A-Za-z]:*" Then Exit Function
+    If Left$(addr, 2) = "\\" Or Left$(addr, 2) = "//" Then Exit Function
+    If InStr(1, addr, "://", vbTextCompare) > 0 Then Exit Function
+    If LCase$(Left$(addr, 5)) = "file:" Then Exit Function
+
+    On Error Resume Next
+    basePath = CStr(wb.BuiltinDocumentProperties("Hyperlink base").Value)
+    If Err.Number = 18 Then On Error GoTo 0: Err.Raise 18
+    Err.Clear
+    If Len(basePath) = 0 Then basePath = wb.Path
+    If Len(basePath) = 0 Or InStr(1, basePath, "://", vbTextCompare) > 0 Then Exit Function
+
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    ResolveLinkPath = fso.GetAbsolutePathName(fso.BuildPath(basePath, Replace(addr, "/", "\")))
+    If Err.Number <> 0 Then
+        Err.Clear
+        ResolveLinkPath = addr
+    End If
 End Function

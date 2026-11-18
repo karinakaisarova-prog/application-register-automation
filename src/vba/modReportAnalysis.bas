@@ -36,6 +36,9 @@ Public Sub ScanWordReportMentions()
     Dim cancelled As Boolean
     Dim oldStatusBar As Variant
     Dim oldCancelKey As XlEnableCancelKey
+    Dim headingText As String
+    Dim paraCount As Long
+    Dim searchFrom As Long
 
     Dim registerWb As Workbook
 
@@ -69,9 +72,8 @@ Public Sub ScanWordReportMentions()
         reportPath = .SelectedItems(1)
     End With
 
-    Set wdApp = CreateObject("Word.Application")
-    wdApp.Visible = False
-    Set wdDoc = wdApp.Documents.Open(reportPath, False, True, False)
+    Set wdApp = OpenHiddenWordForReading()
+    Set wdDoc = OpenDocumentReadOnly(wdApp, reportPath)
 
     ' Сохраняет предыдущий результат, пока новая проверка не завершится успешно.
     On Error Resume Next
@@ -80,7 +82,9 @@ Public Sub ScanWordReportMentions()
     originalSheetExisted = Not (ws Is Nothing)
     If originalSheetExisted Then
         ws.Copy After:=ws
-        Set backupWs = ActiveSheet
+        ' Копию берём по позиции: у скрытого листа копия не становится активной,
+        ' и ActiveSheet указал бы на чужой лист (например, перечень).
+        Set backupWs = ws.Parent.Sheets(ws.Index + 1)
         backupName = "tmpMentions_" & Format$(Now, "yymmdd_hhnnss") & "_" & CStr(GetRegisterWorkbook().Worksheets.Count)
         backupWs.Name = backupName
         Set ws = GetRegisterWorkbook().Worksheets(RESULT_SHEET)
@@ -101,42 +105,54 @@ Public Sub ScanWordReportMentions()
     rx.IgnoreCase = True
     rx.Pattern = "(приложение|приложения|приложению|приложением|приложении|приложений|прил)\.?\s*(№|номер)?\s*([0-9]+[А-ЯA-Z]?)"
 
+    ws.Columns("B").NumberFormat = "@"
+    ws.Columns("D:F").NumberFormat = "@"
+    headingText = "Основной текст (до первого заголовка)"
+
     For Each para In wdDoc.Paragraphs
-        DoEvents
+        paraCount = paraCount + 1
+        If (paraCount Mod 50) = 0 Then
+            DoEvents
+            Application.StatusBar = "Проверка отчёта: абзац " & paraCount & " | упоминаний: " & (rowOut - FIRST_RESULT_ROW)
+        End If
         paraText = Replace(CStr(para.Range.Text), vbCr, "")
         paraText = Replace(paraText, Chr$(7), "")
+        ' неразрывный пробел («№ 5») - как обычный; длина строки не меняется
+        paraText = Replace(paraText, ChrW(160), " ")
+
+        ' Уровень структуры - ближайший заголовок выше упоминания
+        On Error Resume Next
+        Err.Clear
+        outlineLevel = para.OutlineLevel
+        If Err.Number = 18 Then
+            On Error GoTo Failed
+            Err.Raise 18
+        ElseIf Err.Number <> 0 Then
+            Err.Clear
+            outlineLevel = 10
+        End If
+        On Error GoTo Failed
+        If IsNumeric(outlineLevel) Then
+            If CLng(outlineLevel) >= 1 And CLng(outlineLevel) <= 9 Then
+                headingText = "Уровень " & CLng(outlineLevel) & ": " & _
+                              Trim$(GetListNumber(para) & " " & Left$(Trim$(paraText), 120))
+            End If
+        End If
+
         If rx.Test(paraText) Then
             Set matches = rx.Execute(paraText)
-            On Error Resume Next
-            Err.Clear
-            outlineLevel = para.OutlineLevel
-            If Err.Number = 18 Then
-                On Error GoTo 0
-                GoTo Failed
-            ElseIf Err.Number <> 0 Then
-                Err.Clear
-                outlineLevel = ""
-            End If
-            On Error GoTo Failed
 
+            searchFrom = -1
             For Each mt In matches
                 ' Определяет страницу по точному диапазону совпадения, а не по концу абзаца:
                 ' в одном длинном абзаце могут быть упоминания на разных страницах.
-                Set rng = wdDoc.Range(para.Range.Start + CLng(mt.FirstIndex), _
-                                      para.Range.Start + CLng(mt.FirstIndex) + CLng(mt.Length))
-                pageNo = CLng(rng.Information(1)) ' Номер страницы с учётом отображения в документе Word
+                ' Позиция по тексту абзаца может сдвигаться из-за полей и скрытого
+                ' текста - ищем само упоминание внутри абзаца через Find.
+                pageNo = FindMentionPage(wdDoc, para, mt, searchFrom)
                 ws.Cells(rowOut, 1).Value = rowOut - FIRST_RESULT_ROW + 1
                 ws.Cells(rowOut, 2).Value = mt.Value
                 ws.Cells(rowOut, 3).Value = pageNo
-                If IsNumeric(outlineLevel) Then
-                    If CLng(outlineLevel) >= 1 And CLng(outlineLevel) <= 9 Then
-                        ws.Cells(rowOut, 4).Value = CLng(outlineLevel)
-                    Else
-                        ws.Cells(rowOut, 4).Value = "Основной текст"
-                    End If
-                Else
-                    ws.Cells(rowOut, 4).Value = outlineLevel
-                End If
+                ws.Cells(rowOut, 4).Value = headingText
                 ws.Cells(rowOut, 5).Value = Trim$(paraText)
                 ws.Cells(rowOut, 6).Value = reportPath
                 rowOut = rowOut + 1
@@ -159,8 +175,7 @@ Failed:
     cancelled = (Err.Number = 18)
     errText = Err.Description
     On Error Resume Next
-    If Not wdDoc Is Nothing Then wdDoc.Close False
-    If Not wdApp Is Nothing Then wdApp.Quit
+    CloseHiddenWordReader wdApp, wdDoc
 
     ' Восстанавливает прежний лист результата, чтобы после ошибки или отмены не осталось неполных данных.
     If Not backupWs Is Nothing Then
@@ -195,7 +210,7 @@ Failed:
                 Else
                     Err.Clear
                     damagedWs.Name = RESULT_SHEET
-                    LogRestoreIssue "Не удалось вернуть резервной копии исходное имя. Резервная копия сохранена: " & backupWs.Name
+                    recoveryNote = "Не удалось вернуть резервной копии исходное имя. Резервная копия сохранена: " & backupWs.Name
                 End If
             Else
                 Err.Clear
@@ -217,8 +232,7 @@ Failed:
 
 CleanExit:
     On Error Resume Next
-    If Not wdDoc Is Nothing Then wdDoc.Close False
-    If Not wdApp Is Nothing Then wdApp.Quit
+    CloseHiddenWordReader wdApp, wdDoc
 RestoreExcel:
     Application.ScreenUpdating = oldScreen
     Application.EnableEvents = oldEvents
@@ -247,6 +261,8 @@ Public Sub CountPagesForRegister()
     Dim pageSnapshotTaken As Boolean
     Dim oldStatusBar As Variant
     Dim oldCancelKey As XlEnableCancelKey
+    Dim wbOpenedHere As Boolean
+    Dim fso As Object
 
     oldScreen = Application.ScreenUpdating
     oldEvents = Application.EnableEvents
@@ -272,6 +288,7 @@ Public Sub CountPagesForRegister()
     ' Сохраняет исходный столбец с количеством страниц, чтобы восстановить его при прерывании или критической ошибке.
     oldPageValues = ws.Range("J3:J" & lastRow).Formula
     pageSnapshotTaken = True
+    Set fso = CreateObject("Scripting.FileSystemObject")
 
     For r = 3 To lastRow
         DoEvents
@@ -281,22 +298,27 @@ Public Sub CountPagesForRegister()
             failed = failed + 1
             GoTo NextRow
         End If
-        If Len(filePath) > 0 And Len(Dir$(filePath)) > 0 Then
+        If Len(filePath) > 0 And FileExistsSafe(fso, filePath) Then
             ext = GetFileExtensionFromPath(filePath)
             pages = Empty
             On Error GoTo FileFailed
             Select Case ext
                 Case "doc", "docx", "docm"
-                    If wdApp Is Nothing Then Set wdApp = CreateObject("Word.Application")
-                    wdApp.Visible = False
-                    Set wdDoc = wdApp.Documents.Open(filePath, False, True, False)
+                    If wdApp Is Nothing Then Set wdApp = OpenHiddenWordForReading()
+                    Set wdDoc = OpenDocumentReadOnly(wdApp, filePath)
                     pages = wdDoc.ComputeStatistics(2) ' wdStatisticPages
-                    wdDoc.Close False
+                    wdDoc.Close 0
                     Set wdDoc = Nothing
                 Case "xls", "xlsx", "xlsm", "xlsb"
-                    Set wb = Workbooks.Open(filePath, ReadOnly:=True, UpdateLinks:=0, AddToMru:=False)
+                    ' Книгу, которая уже открыта у пользователя, не закрываем
+                    Set wb = FindOpenWorkbook(filePath)
+                    wbOpenedHere = False
+                    If wb Is Nothing Then
+                        Set wb = Workbooks.Open(filePath, ReadOnly:=True, UpdateLinks:=0, AddToMru:=False)
+                        wbOpenedHere = True
+                    End If
                     pages = CountWorkbookPrintPages(wb)
-                    wb.Close False
+                    If wbOpenedHere Then wb.Close False
                     Set wb = Nothing
                 Case "pdf"
                     pages = CountPdfPagesWithAcrobat(filePath)
@@ -347,9 +369,9 @@ FileFailed:
         ws.Cells(r, 10).Value = "Ошибка чтения"
     End If
     On Error Resume Next
-    If Not wdDoc Is Nothing Then wdDoc.Close False
+    If Not wdDoc Is Nothing Then wdDoc.Close 0
     Set wdDoc = Nothing
-    If Not wb Is Nothing Then wb.Close False
+    If Not wb Is Nothing And wbOpenedHere Then wb.Close False
     Set wb = Nothing
     Err.Clear
     On Error GoTo Failed
@@ -360,16 +382,15 @@ Failed:
     If Err.Number = 18 Then errText = "Операция отменена пользователем (Ctrl+Break)."
     On Error Resume Next
     If pageSnapshotTaken Then ws.Range("J3:J" & lastRow).Formula = oldPageValues
-    If Not wdDoc Is Nothing Then wdDoc.Close False
-    If Not wdApp Is Nothing Then wdApp.Quit
-    If Not wb Is Nothing Then wb.Close False
+    CloseHiddenWordReader wdApp, wdDoc
+    If Not wb Is Nothing And wbOpenedHere Then wb.Close False
+    Set wb = Nothing
     Application.StatusBar = False
     MsgBox "Подсчёт страниц прерван: " & errText, vbExclamation
 CleanExit:
     On Error Resume Next
-    If Not wdDoc Is Nothing Then wdDoc.Close False
-    If Not wdApp Is Nothing Then wdApp.Quit
-    If Not wb Is Nothing Then wb.Close False
+    CloseHiddenWordReader wdApp, wdDoc
+    If Not wb Is Nothing And wbOpenedHere Then wb.Close False
     Application.ScreenUpdating = oldScreen
     Application.EnableEvents = oldEvents
     Application.DisplayAlerts = oldAlerts
@@ -430,16 +451,20 @@ Private Function CountWorkbookPrintPages(ByVal wb As Workbook) As Long
     Dim v As Long
     Dim pageBreakError As Long
     Dim pageBreakDescription As String
+    Dim oldPageBreaks As Boolean
 
     For Each sh In wb.Worksheets
         DoEvents
+        If sh.Visible <> xlSheetVisible Then GoTo NextSheet   ' скрытые листы не печатаются
         On Error Resume Next
         Err.Clear
+        oldPageBreaks = sh.DisplayPageBreaks
         sh.DisplayPageBreaks = True
         h = sh.HPageBreaks.Count + 1
         v = sh.VPageBreaks.Count + 1
         pageBreakError = Err.Number
         pageBreakDescription = Err.Description
+        sh.DisplayPageBreaks = oldPageBreaks   ' вид книги (в том числе уже открытой у пользователя) не меняем
         On Error GoTo 0
 
         ' Не указывает условную одну страницу, если Excel не может определить
@@ -452,6 +477,7 @@ Private Function CountWorkbookPrintPages(ByVal wb As Workbook) As Long
         End If
 
         If Application.WorksheetFunction.CountA(sh.UsedRange) > 0 Then total = total + (h * v)
+NextSheet:
     Next sh
     CountWorkbookPrintPages = total
 End Function
@@ -459,7 +485,7 @@ End Function
 Private Function GetRegisterPath(ByVal c As Range) As String
     On Error Resume Next
     If c.Hyperlinks.Count > 0 Then
-        GetRegisterPath = CStr(c.Hyperlinks(1).Address)
+        GetRegisterPath = ResolveLinkPath(CStr(c.Hyperlinks(1).Address), c.Worksheet.Parent)
         If Len(GetRegisterPath) = 0 Then GetRegisterPath = CStr(c.Hyperlinks(1).SubAddress)
     Else
         GetRegisterPath = CStr(c.Value)
@@ -536,3 +562,97 @@ Private Sub FormatReportResults(ByVal ws As Worksheet, ByVal lastRow As Long)
     ws.Columns("F").ColumnWidth = 45
     ws.Columns("E:F").WrapText = True
 End Sub
+
+' Невидимый Word для чтения: без диалогов и без макросов документа
+' (любое окно в невидимом Word заставило бы Excel ждать бесконечно).
+Private Function OpenHiddenWordForReading() As Object
+    Dim wdApp As Object
+    Set wdApp = CreateObject("Word.Application")
+    wdApp.Visible = False
+    wdApp.DisplayAlerts = 0                 ' wdAlertsNone
+    On Error Resume Next
+    wdApp.AutomationSecurity = 3            ' msoAutomationSecurityForceDisable
+    On Error GoTo 0
+    Set OpenHiddenWordForReading = wdApp
+End Function
+
+' Открывает документ только для чтения. Документ с паролем не спрашивает
+' пароль, а даёт ошибку - она попадает в отчёт как «Ошибка чтения».
+Private Function OpenDocumentReadOnly(ByVal wdApp As Object, ByVal filePath As String) As Object
+    Set OpenDocumentReadOnly = wdApp.Documents.Open(FileName:=filePath, ConfirmConversions:=False, _
+        ReadOnly:=True, AddToRecentFiles:=False, PasswordDocument:="#", Visible:=False)
+End Function
+
+Private Sub CloseHiddenWordReader(ByRef wdApp As Object, ByRef wdDoc As Object)
+    On Error Resume Next
+    If Not wdDoc Is Nothing Then wdDoc.Close 0
+    Set wdDoc = Nothing
+    If Not wdApp Is Nothing Then
+        wdApp.NormalTemplate.Saved = True
+        wdApp.Quit 0
+    End If
+    Set wdApp = Nothing
+End Sub
+
+' Номер страницы упоминания: Find внутри абзаца по тексту совпадения.
+' searchFrom - позиция, с которой искать следующее совпадение этого же абзаца
+' (-1 - с начала абзаца).
+Private Function FindMentionPage(ByVal wdDoc As Object, ByVal para As Object, ByVal mt As Object, _
+                                 ByRef searchFrom As Long) As Long
+    Dim rng As Object
+    Dim startPos As Long
+
+    startPos = para.Range.Start
+    If searchFrom > startPos Then startPos = searchFrom
+    Set rng = wdDoc.Range(startPos, para.Range.End)
+    With rng.Find
+        .ClearFormatting
+        .Text = CStr(mt.Value)
+        .MatchCase = False
+        .MatchWildcards = False
+        .Forward = True
+        .Wrap = 0                           ' wdFindStop
+    End With
+    If rng.Find.Execute Then
+        FindMentionPage = CLng(rng.Information(1))
+        searchFrom = rng.End
+    Else
+        ' запасной путь - позиция по тексту абзаца
+        Set rng = wdDoc.Range(para.Range.Start + CLng(mt.FirstIndex), _
+                              para.Range.Start + CLng(mt.FirstIndex) + CLng(mt.Length))
+        FindMentionPage = CLng(rng.Information(1))
+    End If
+End Function
+
+' Номер заголовка из автонумерации («2.1»), если есть
+Private Function GetListNumber(ByVal para As Object) As String
+    On Error Resume Next
+    GetListNumber = CStr(para.Range.ListFormat.ListString)
+    If Err.Number = 18 Then
+        On Error GoTo 0
+        Err.Raise 18
+    End If
+    Err.Clear
+End Function
+
+Private Function FindOpenWorkbook(ByVal filePath As String) As Workbook
+    Dim w As Workbook
+    For Each w In Application.Workbooks
+        If StrComp(w.FullName, filePath, vbTextCompare) = 0 Then
+            Set FindOpenWorkbook = w
+            Exit Function
+        End If
+    Next w
+End Function
+
+' Проверка существования файла без ошибки на недопустимом или длинном пути
+' и с любыми буквами в имени (Dir$ понимает только кодировку Windows).
+Private Function FileExistsSafe(ByVal fso As Object, ByVal filePath As String) As Boolean
+    On Error Resume Next
+    FileExistsSafe = fso.FileExists(filePath)
+    If Err.Number = 18 Then
+        On Error GoTo 0
+        Err.Raise 18
+    End If
+    Err.Clear
+End Function

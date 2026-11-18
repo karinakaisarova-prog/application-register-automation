@@ -11,6 +11,8 @@ Private Const COL_APP_NUMBER As Long = 3
 Private Const COL_TITLE As Long = 4
 Private Const COL_LINK As Long = 7
 Private Const LOG_SHEET As String = "Журнал переименования"
+Private Const SKIP_SHEET As String = "Пропуски переименования"
+Private Const PREVIEW_MAX_LEN As Long = 700   ' окно MsgBox показывает около 1024 символов
 
 Public Sub RenameFilesFromRegister()
     Dim ws As Worksheet, logWs As Worksheet
@@ -30,6 +32,7 @@ Public Sub RenameFilesFromRegister()
     Dim renameInProgress As Boolean
     Dim currentRenameItem As Object
     Dim alreadyTracked As Boolean
+    Dim shownCount As Long
 
     oldScreen = Application.ScreenUpdating
     oldEvents = Application.EnableEvents
@@ -62,8 +65,13 @@ Public Sub RenameFilesFromRegister()
     For r = FIRST_DATA_ROW To lastRow
         DoEvents
         oldPath = RegisterFilePath(ws.Cells(r, COL_LINK))
-        If Len(oldPath) = 0 Then GoTo ContinueRow
-        If Len(Dir$(oldPath)) = 0 Then
+        If Len(oldPath) = 0 Then
+            If ws.Cells(r, COL_LINK).Hyperlinks.Count > 0 Or Len(Trim$(CStr(ws.Cells(r, COL_LINK).Text))) > 0 Then
+                problems = problems & "Строка " & r & ": ссылка на файл не распознана (адрес интернета или неполный путь)." & vbCrLf
+            End If
+            GoTo ContinueRow
+        End If
+        If Not PathExists(oldPath) Then
             problems = problems & "Строка " & r & ": исходный файл не найден — " & oldPath & vbCrLf
             GoTo ContinueRow
         End If
@@ -98,7 +106,7 @@ Public Sub RenameFilesFromRegister()
             GoTo ContinueRow
         End If
         seen(newPath) = True
-        If Len(Dir$(newPath)) > 0 Then
+        If PathExists(newPath) Then
             problems = problems & "Строка " & r & ": целевой файл уже существует — " & newPath & vbCrLf
             GoTo ContinueRow
         End If
@@ -114,20 +122,28 @@ ContinueRow:
     Next r
 
     If plan.Count = 0 Then
-        MsgBox "Нет безопасных переименований для выполнения." & IIf(Len(problems) > 0, vbCrLf & problems, ""), vbInformation
+        WriteRenamePlanSheet ws, plan, problems
+        MsgBox "Нет безопасных переименований для выполнения." & _
+               IIf(Len(problems) > 0, vbCrLf & "Пропущено строк: " & CountLines(problems) & _
+                   vbCrLf & "Причины - на листе «" & SKIP_SHEET & "».", ""), vbInformation
         GoTo CleanExit
     End If
 
-    preview = "Будут переименованы файлы: " & plan.Count & vbCrLf & vbCrLf
+    ' Окно MsgBox обрезает текст после ~1024 символов: показываем начало списка,
+    ' полный план и пропуски - на листе «Пропуски переименования».
+    WriteRenamePlanSheet ws, plan, problems
+    preview = "Лист перечня: " & ws.Name & vbCrLf & _
+              "Будут переименованы файлы: " & plan.Count & vbCrLf & vbCrLf
+    shownCount = 0
     For Each item In plan
-        preview = preview & CStr(item("OldName")) & vbCrLf & "  → " & CStr(item("NewName")) & vbCrLf & vbCrLf
-        If Len(preview) > 5500 Then
-            preview = preview & "... Остальные файлы будут записаны в журнал." & vbCrLf
-            Exit For
-        End If
+        If Len(preview) > PREVIEW_MAX_LEN Then Exit For
+        preview = preview & CStr(item("OldName")) & vbCrLf & "  -> " & CStr(item("NewName")) & vbCrLf
+        shownCount = shownCount + 1
     Next item
-    If Len(problems) > 0 Then preview = preview & "Пропущенные строки:" & vbCrLf & problems
-    If MsgBox(preview & vbCrLf & "Продолжить? Исходные файлы будут переименованы.", _
+    If shownCount < plan.Count Then preview = preview & "... и ещё " & (plan.Count - shownCount) & vbCrLf
+    If Len(problems) > 0 Then preview = preview & vbCrLf & "Пропущено строк: " & CountLines(problems)
+    preview = preview & vbCrLf & "Полный список - на листе «" & SKIP_SHEET & "»."
+    If MsgBox(preview & vbCrLf & vbCrLf & "Продолжить? Исходные файлы будут переименованы.", _
               vbYesNo + vbQuestion + vbDefaultButton2, "Подтверждение переименования") <> vbYes Then GoTo CleanExit
 
     Set logWs = GetOrCreateRenameLog(LOG_SHEET)
@@ -196,7 +212,9 @@ ContinueRow:
 
     FormatRenameLog logWs
     MsgBox "Переименование завершено. Успешно: " & renamed & "; ошибок: " & failed & _
-           IIf(Len(problems) > 0, vbCrLf & vbCrLf & "Пропуски:" & vbCrLf & problems, ""), vbInformation
+           IIf(Len(problems) > 0, vbCrLf & "Пропущено строк: " & CountLines(problems) & _
+               " - причины на листе «" & SKIP_SHEET & "».", "") & vbCrLf & _
+           "Подробности - в журнале «" & LOG_SHEET & "».", vbInformation
     GoTo CleanExit
 
 Failed:
@@ -208,8 +226,8 @@ Failed:
     On Error Resume Next
     Application.EnableCancelKey = xlDisabled
     If renameInProgress And Not currentRenameItem Is Nothing Then
-        If Len(Dir$(CStr(currentRenameItem("NewPath")))) > 0 And _
-           Len(Dir$(CStr(currentRenameItem("OldPath")))) = 0 Then
+        If PathExists(CStr(currentRenameItem("NewPath"))) And _
+           Not PathExists(CStr(currentRenameItem("OldPath"))) Then
             alreadyTracked = False
             For rollbackIndex = 1 To renamedItems.Count
                 Set rollbackItem = renamedItems(rollbackIndex)
@@ -229,7 +247,8 @@ Failed:
             If Len(rollbackError) = 0 Then
                 rollbackError = ""
                 If Not ws Is Nothing Then
-                    rollbackError = RestoreRegisterHyperlink(ws, CLng(rollbackItem("Row")), CStr(rollbackItem("OldPath")))
+                    rollbackError = RestoreRegisterHyperlinkChecked(ws, CLng(rollbackItem("Row")), _
+                                        CStr(rollbackItem("NewPath")), CStr(rollbackItem("OldPath")))
                 End If
                 If Len(rollbackError) > 0 Then
                     problems = problems & "Файл возвращён, но ссылка в строке " & CLng(rollbackItem("Row")) & _
@@ -266,10 +285,10 @@ Failed:
     End If
     If Not logWs Is Nothing Then logWs.Parent.Save
     On Error GoTo 0
-    MsgBox failure & vbCrLf & _
-           IIf(Len(problems) > 0, "Проблемы и пропуски:" & vbCrLf & problems & vbCrLf, "") & _
+    MsgBox Left$(failure, 300) & vbCrLf & _
+           IIf(Len(problems) > 0, "Проблем и пропусков: " & CountLines(problems) & vbCrLf, "") & _
            "Выполненные в этом запуске переименования автоматически отменены, где это удалось. " & _
-           "Проверьте журнал и пути файлов.", vbExclamation
+           "Проверьте журнал «" & LOG_SHEET & "» и пути файлов.", vbExclamation
 CleanExit:
     Application.ScreenUpdating = oldScreen
     Application.EnableEvents = oldEvents
@@ -292,6 +311,7 @@ Public Sub RollbackLastRenameBatch()
     Dim rollbackInProgress As Boolean
     Dim activeRollbackItem As Object
     Dim alreadyTracked As Boolean
+    Dim linkProblems As Long
 
     oldScreen = Application.ScreenUpdating
     oldEvents = Application.EnableEvents
@@ -333,10 +353,10 @@ Public Sub RollbackLastRenameBatch()
         statusText = CStr(logWs.Cells(r, 7).Value)
         If Len(Trim$(CStr(logWs.Cells(r, 8).Value))) > 0 And _
            Len(candidateOldPath) > 0 And Len(candidateNewPath) > 0 Then
-            If Len(Dir$(candidateNewPath)) > 0 And Len(Dir$(candidateOldPath)) = 0 Then
+            If PathExists(candidateNewPath) And Not PathExists(candidateOldPath) Then
                 batchId = Trim$(CStr(logWs.Cells(r, 8).Value))
                 Exit For
-            ElseIf Len(Dir$(candidateOldPath)) > 0 And Len(Dir$(candidateNewPath)) = 0 Then
+            ElseIf PathExists(candidateOldPath) And Not PathExists(candidateNewPath) Then
                 If Left$(statusText, Len("Файл возвращён; ошибка восстановления ссылки:")) = "Файл возвращён; ошибка восстановления ссылки:" Or _
                    Left$(statusText, Len("Ошибка восстановления после прерывания:")) = "Ошибка восстановления после прерывания:" Or _
                    statusText = "Ошибка отката" Or _
@@ -367,7 +387,7 @@ Public Sub RollbackLastRenameBatch()
             If Left$(statusText, Len("Ошибка:")) = "Ошибка:" Then
                 logWs.Cells(r, 7).Value = "Не требует отката: исходное переименование не выполнено"
                 skipped = skipped + 1
-            ElseIf Len(Dir$(oldPath)) > 0 And Len(Dir$(newPath)) = 0 Then
+            ElseIf PathExists(oldPath) And Not PathExists(newPath) Then
                 If statusText = "Подготовка" Then
                     logWs.Cells(r, 7).Value = "Не требует отката: переименование не начиналось"
                     skipped = skipped + 1
@@ -392,7 +412,7 @@ Public Sub RollbackLastRenameBatch()
                     On Error GoTo Failed
                     recoveryError = ""
                     If Not registerWs Is Nothing And registerRow > 0 Then
-                        recoveryError = RestoreRegisterHyperlink(registerWs, registerRow, oldPath)
+                        recoveryError = RestoreRegisterHyperlinkChecked(registerWs, registerRow, newPath, oldPath)
                     Else
                         recoveryError = "Не найден лист или строка перечня для обновления ссылки."
                     End If
@@ -408,7 +428,7 @@ Public Sub RollbackLastRenameBatch()
                     skipped = skipped + 1
                     End If
                 End If
-            ElseIf Len(Dir$(newPath)) = 0 Or Len(Dir$(oldPath)) > 0 Then
+            ElseIf Not PathExists(newPath) Or PathExists(oldPath) Then
                 logWs.Cells(r, 7).Value = "Откат пропущен: конфликт путей (проверьте оба имени)"
                 skipped = skipped + 1
             Else
@@ -435,15 +455,16 @@ Public Sub RollbackLastRenameBatch()
                     On Error GoTo Failed
                     recoveryError = ""
                     If Not registerWs Is Nothing And registerRow > 0 Then
-                        recoveryError = RestoreRegisterHyperlink(registerWs, registerRow, oldPath)
+                        recoveryError = RestoreRegisterHyperlinkChecked(registerWs, registerRow, newPath, oldPath)
                     Else
                         recoveryError = "Не найден лист или строка перечня для обновления ссылки."
                     End If
                     If Len(recoveryError) = 0 Then
                         logWs.Cells(r, 7).Value = "Откатан"
                     Else
+                        ' файл возвращён - считается восстановленным; ссылка отмечена в журнале
                         logWs.Cells(r, 7).Value = "Файл возвращён; ошибка восстановления ссылки: " & recoveryError
-                        skipped = skipped + 1
+                        linkProblems = linkProblems + 1
                     End If
                     restored = restored + 1
                 Else
@@ -455,7 +476,11 @@ Public Sub RollbackLastRenameBatch()
         End If
     Next r
     FormatRenameLog logWs
-    MsgBox "Откат завершён. Восстановлено: " & restored & "; пропущено: " & skipped, vbInformation
+    ' Журнал и ссылки должны совпадать с файлами на диске, даже если Excel
+    ' закроют без сохранения.
+    logWs.Parent.Save
+    MsgBox "Откат завершён. Восстановлено: " & restored & "; пропущено: " & skipped & _
+           IIf(linkProblems > 0, vbCrLf & "Ссылок не обновлено: " & linkProblems & " (см. журнал)", ""), vbInformation
     GoTo CleanExit
 
 Failed:
@@ -465,8 +490,8 @@ Failed:
     On Error Resume Next
     Application.EnableCancelKey = xlDisabled
     If rollbackInProgress And Not activeRollbackItem Is Nothing Then
-        If Len(Dir$(CStr(activeRollbackItem("OldPath")))) > 0 And _
-           Len(Dir$(CStr(activeRollbackItem("NewPath")))) = 0 Then
+        If PathExists(CStr(activeRollbackItem("OldPath"))) And _
+           Not PathExists(CStr(activeRollbackItem("NewPath"))) Then
             alreadyTracked = False
             For recoveryIndex = 1 To reversedItems.Count
                 Set item = reversedItems(recoveryIndex)
@@ -489,7 +514,8 @@ Failed:
             Set registerWs = GetRegisterWorkbook().Worksheets(CStr(item("SheetName")))
             recoveryError = ""
             If Not registerWs Is Nothing And CLng(item("RegisterRow")) > 0 Then
-                recoveryError = RestoreRegisterHyperlink(registerWs, CLng(item("RegisterRow")), CStr(item("NewPath")))
+                recoveryError = RestoreRegisterHyperlinkChecked(registerWs, CLng(item("RegisterRow")), _
+                                    CStr(item("OldPath")), CStr(item("NewPath")))
             Else
                 recoveryError = "Не найден лист или строка перечня для обновления ссылки."
             End If
@@ -542,17 +568,20 @@ End Function
 
 Private Function TryRenameFile(ByVal oldPath As String, ByVal newPath As String) As String
     Dim savedErrNumber As Long
+    Dim fso As Object
     Dim savedErrDescription As String
     On Error GoTo RenameError
-    If Len(Dir$(oldPath)) = 0 Then
+    If Not PathExists(oldPath) Then
         TryRenameFile = "Исходный файл не найден."
         Exit Function
     End If
-    If Len(Dir$(newPath)) > 0 Then
+    If PathExists(newPath) Then
         TryRenameFile = "Целевой файл уже существует."
         Exit Function
     End If
-    Name oldPath As newPath
+    ' FileSystemObject понимает любые буквы в именах (оператор Name - только кодировку Windows)
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    fso.MoveFile oldPath, newPath
     Exit Function
 RenameError:
     savedErrNumber = Err.Number
@@ -580,7 +609,7 @@ Private Function RegisterFilePath(ByVal c As Range) As String
             Err.Raise savedErrNumber, "RegisterFilePath", savedErrDescription
         End If
         If Len(linkAddress) = 0 Then Exit Function
-        RegisterFilePath = linkAddress
+        RegisterFilePath = ResolveLinkPath(linkAddress, c.Worksheet.Parent)
     Else
         RegisterFilePath = Trim$(CStr(c.Value))
     End If
@@ -627,10 +656,21 @@ Private Function CleanFileName(ByVal value As String) As String
     For i = LBound(invalidChars) To UBound(invalidChars)
         value = Replace(value, CStr(invalidChars(i)), "_")
     Next i
+    ' переносы строк (Alt+Enter) и другие управляющие символы недопустимы в имени файла
+    For i = 0 To 31
+        value = Replace(value, Chr$(i), " ")
+    Next i
+    Do While InStr(value, "  ") > 0
+        value = Replace(value, "  ", " ")
+    Loop
     Do While InStr(value, "__") > 0
         value = Replace(value, "__", "_")
     Loop
-    CleanFileName = Trim$(value)
+    value = Trim$(value)
+    Do While Len(value) > 0 And (Right$(value, 1) = "." Or Right$(value, 1) = " ")
+        value = Left$(value, Len(value) - 1)
+    Loop
+    CleanFileName = value
 End Function
 
 Private Function GetOrCreateRenameLog(ByVal sheetName As String) As Worksheet
@@ -651,4 +691,106 @@ Private Sub FormatRenameLog(ByVal ws As Worksheet)
     ws.Rows(1).Font.Bold = True
     ws.Rows(1).Interior.Color = RGB(198, 224, 180)
     ws.Columns("A:H").AutoFit
+End Sub
+
+' Существует ли файл или папка. Без ошибки на недопустимом или слишком
+' длинном пути (Dir$ давал ошибку 52 и обрывал весь запуск).
+Private Function PathExists(ByVal filePath As String) As Boolean
+    Dim fso As Object
+    If Len(filePath) = 0 Then Exit Function
+    On Error Resume Next
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    PathExists = fso.FileExists(filePath) Or fso.FolderExists(filePath)
+    If Err.Number = 18 Then
+        On Error GoTo 0
+        Err.Raise 18
+    End If
+    Err.Clear
+End Function
+
+' Возвращает ссылку в строке перечня, где она сейчас указывает на currentPath.
+' Номер строки из журнала мог устареть (перечень пересобран или отсортирован):
+' сначала проверяется строка из журнала, затем ищется весь столбец ссылок.
+Private Function RestoreRegisterHyperlinkChecked(ByVal targetWs As Worksheet, ByVal rowNo As Long, _
+                                                 ByVal currentPath As String, ByVal filePath As String) As String
+    Dim lastRow As Long, r As Long
+    Dim foundRow As Long
+
+    ' Ссылка уже указывает на нужный файл (например, перечень пересобран
+    ' после отката) - менять нечего, это успех.
+    If rowNo >= FIRST_DATA_ROW Then
+        If StrComp(RegisterFilePath(targetWs.Cells(rowNo, COL_LINK)), filePath, vbTextCompare) = 0 Then Exit Function
+        If StrComp(RegisterFilePath(targetWs.Cells(rowNo, COL_LINK)), currentPath, vbTextCompare) = 0 Then foundRow = rowNo
+    End If
+    If foundRow = 0 Then
+        lastRow = targetWs.Cells(targetWs.Rows.Count, COL_LINK).End(xlUp).Row
+        For r = FIRST_DATA_ROW To lastRow
+            If StrComp(RegisterFilePath(targetWs.Cells(r, COL_LINK)), filePath, vbTextCompare) = 0 Then Exit Function
+            If StrComp(RegisterFilePath(targetWs.Cells(r, COL_LINK)), currentPath, vbTextCompare) = 0 Then
+                foundRow = r
+                Exit For
+            End If
+        Next r
+    End If
+    If foundRow = 0 Then
+        RestoreRegisterHyperlinkChecked = "в перечне нет строки со ссылкой на " & currentPath & " - ссылки не менялись"
+        Exit Function
+    End If
+    RestoreRegisterHyperlinkChecked = RestoreRegisterHyperlink(targetWs, foundRow, filePath)
+End Function
+
+Private Function CountLines(ByVal text As String) As Long
+    Dim parts() As String
+    Dim i As Long
+    If Len(text) = 0 Then Exit Function
+    parts = Split(text, vbCrLf)
+    For i = LBound(parts) To UBound(parts)
+        If Len(Trim$(parts(i))) > 0 Then CountLines = CountLines + 1
+    Next i
+End Function
+
+' Лист с полным планом переименования и причинами пропусков (перезаписывается
+' при каждом запуске): окно подтверждения показывает только начало списка.
+Private Sub WriteRenamePlanSheet(ByVal registerWs As Worksheet, ByVal plan As Collection, ByVal problems As String)
+    Dim ws As Worksheet
+    Dim item As Variant
+    Dim parts() As String
+    Dim r As Long, i As Long
+
+    On Error Resume Next
+    Set ws = GetRegisterWorkbook().Worksheets(SKIP_SHEET)
+    On Error GoTo 0
+    If ws Is Nothing Then
+        Set ws = GetRegisterWorkbook().Worksheets.Add(After:=GetRegisterWorkbook().Worksheets(GetRegisterWorkbook().Worksheets.Count))
+        ws.Name = SKIP_SHEET
+    End If
+    ws.Cells.Clear
+    ws.Columns("A:D").NumberFormat = "@"
+    ws.Range("A1:D1").Value = Array("Лист перечня: " & registerWs.Name, "Строка", "Старое имя / причина пропуска", "Новое имя")
+    ws.Rows(1).Font.Bold = True
+    r = 2
+    For Each item In plan
+        ws.Cells(r, 1).Value = "В плане (до подтверждения)"
+        ws.Cells(r, 2).Value = CStr(item("Row"))
+        ws.Cells(r, 3).Value = CStr(item("OldName"))
+        ws.Cells(r, 4).Value = CStr(item("NewName"))
+        r = r + 1
+    Next item
+    If Len(problems) > 0 Then
+        parts = Split(problems, vbCrLf)
+        For i = LBound(parts) To UBound(parts)
+            If Len(Trim$(parts(i))) > 0 Then
+                ws.Cells(r, 1).Value = "Пропуск"
+                ws.Cells(r, 3).Value = parts(i)
+                r = r + 1
+            End If
+        Next i
+    End If
+    ws.Columns("A:B").AutoFit
+    ws.Columns("C:D").ColumnWidth = 70
+    ' новый лист становится активным - возвращаем пользователя на перечень
+    On Error Resume Next
+    registerWs.Parent.Activate
+    registerWs.Activate
+    On Error GoTo 0
 End Sub
