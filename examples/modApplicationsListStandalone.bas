@@ -313,8 +313,8 @@ Private Sub CollectFiles(ByVal rootPath As String, ByVal currentPath As String, 
         DoEvents
         Application.StatusBar = "Проверка файла: " & CStr(fileItem.Name)
         ext = LCase$(fso.GetExtensionName(fileItem.Name))
-        If IsSkippedFile(fileItem) Then
-        ElseIf IsSupportedExtension(ext) Then
+        If Not IsSkippedFile(fileItem) Then
+            If IsSupportedExtension(ext) Then
             If Not mSeenPaths.Exists(CStr(fileItem.Path)) Then
                 mSeenPaths.Add CStr(fileItem.Path), True
                 Set info = ParseFileName(CStr(fileItem.Name))
@@ -333,6 +333,7 @@ Private Sub CollectFiles(ByVal rootPath As String, ByVal currentPath As String, 
             Else
                 LogLine "Повторный путь пропущен: " & CStr(fileItem.Path)
             End If
+        End If
         End If
     Next fileItem
 
