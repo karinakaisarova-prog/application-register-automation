@@ -82,6 +82,12 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
         sharePointUrl = Trim$(InputBox("Вставьте полный адрес папки SharePoint, начиная с http:// или https://", _
                                        "Адрес папки SharePoint"))
         If Len(sharePointUrl) = 0 Then GoTo CleanExit
+        If Len(sharePointUrl) >= 254 Then
+            MsgBox "Адрес слишком длинный: окно ввода может обрезать его." & vbCrLf & _
+                   "Выберите синхронизированную папку SharePoint через Проводник Windows.", _
+                   vbExclamation, "Слишком длинный адрес"
+            GoTo CleanExit
+        End If
         If LCase$(Left$(sharePointUrl, 7)) <> "http://" And _
            LCase$(Left$(sharePointUrl, 8)) <> "https://" Then
             MsgBox "Укажите полный веб-адрес, начинающийся с http:// или https://.", vbExclamation, "Неверный адрес"
@@ -98,6 +104,13 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
     Set ws = Nothing
     If WorksheetExists(sheetName) Then
         Set ws = FindWorksheet(sheetName)
+    End If
+    If Not ws Is Nothing Then
+        If Not IsRegisterSheet(ws) Then
+            LogLine "Лист «" & ws.Name & "» не является перечнем и не изменён."
+            Set ws = Nothing
+            sheetName = GetUniqueListSheetName(sheetName)
+        End If
     End If
     targetWasExisting = Not ws Is Nothing
     originalSheetName = sheetName
@@ -300,7 +313,8 @@ Private Sub CollectFiles(ByVal rootPath As String, ByVal currentPath As String, 
         DoEvents
         Application.StatusBar = "Проверка файла: " & CStr(fileItem.Name)
         ext = LCase$(fso.GetExtensionName(fileItem.Name))
-        If IsSupportedExtension(ext) Then
+        If IsSkippedFile(fileItem) Then
+        ElseIf IsSupportedExtension(ext) Then
             If Not mSeenPaths.Exists(CStr(fileItem.Path)) Then
                 mSeenPaths.Add CStr(fileItem.Path), True
                 Set info = ParseFileName(CStr(fileItem.Name))
@@ -328,6 +342,9 @@ Private Sub CollectFiles(ByVal rootPath As String, ByVal currentPath As String, 
             Application.StatusBar = "Обработка папки: " & CStr(subFolder.Path)
             CollectFiles rootPath, CStr(subFolder.Path), depth + 1
         Next subFolder
+    ElseIf folder.SubFolders.Count > 0 Then
+        mFolderErrorCount = mFolderErrorCount + 1
+        LogLine "НЕ ПРОСМОТРЕНЫ вложенные папки глубже " & MAX_FOLDER_DEPTH & " уровней: " & currentPath
     End If
     Exit Sub
 
@@ -347,6 +364,53 @@ FolderError:
     End If
     Err.Clear
 End Sub
+
+Private Function IsSkippedFile(ByVal fileItem As Object) As Boolean
+    Dim registerPath As String
+
+    If Left$(CStr(fileItem.Name), 2) = "~$" Then
+        IsSkippedFile = True
+        Exit Function
+    End If
+
+    If (CLng(fileItem.Attributes) And 2) <> 0 Then
+        IsSkippedFile = True
+        Exit Function
+    End If
+
+    On Error Resume Next
+    registerPath = ThisWorkbook.FullName
+    If Err.Number = 18 Then
+        On Error GoTo 0
+        Err.Raise 18
+    End If
+    Err.Clear
+    On Error GoTo 0
+
+    If Len(registerPath) > 0 Then
+        IsSkippedFile = (StrComp(CStr(fileItem.Path), registerPath, vbTextCompare) = 0)
+    End If
+End Function
+
+Private Function IsRegisterSheet(ByVal ws As Worksheet) As Boolean
+    If ws Is Nothing Then Exit Function
+    IsRegisterSheet = (Trim$(CStr(ws.Cells(2, 1).Text)) = "№ п/п" And _
+                       Trim$(CStr(ws.Cells(2, 6).Text)) = "Ответственное лицо" And _
+                       Trim$(CStr(ws.Cells(2, 8).Text)) = "Раздел")
+End Function
+
+Private Function GetUniqueListSheetName(ByVal baseName As String) As String
+    Dim candidate As String
+    Dim suffix As Long
+
+    suffix = 2
+    Do
+        candidate = Left$(baseName, 31 - Len(" (" & suffix & ")")) & " (" & suffix & ")"
+        If Not WorksheetExists(candidate) Then Exit Do
+        suffix = suffix + 1
+    Loop
+    GetUniqueListSheetName = candidate
+End Function
 
 Private Function IsSupportedExtension(ByVal ext As String) As Boolean
     IsSupportedExtension = (ext = "doc" Or ext = "docx" Or ext = "docm" Or ext = "pdf" Or _
