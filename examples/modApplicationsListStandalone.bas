@@ -643,7 +643,7 @@ Private Function ResolveLinkPath(ByVal addr As String, ByVal wb As Workbook) As 
         Exit Function
     End If
 
-    ResolveLinkPath = fso.GetAbsolutePathName(fso.BuildPath(basePath, Replace(addr, "/", "\\")))
+    ResolveLinkPath = fso.GetAbsolutePathName(fso.BuildPath(basePath, Replace(addr, "/", "\")))
     operationError = Err.Number
     If operationError = 18 Then
         On Error GoTo 0
