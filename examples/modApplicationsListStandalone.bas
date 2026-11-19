@@ -571,7 +571,7 @@ End Sub
 Private Function GetCellLinkPath(ByVal c As Range) As String
     On Error GoTo ReadFailed
     If c.Hyperlinks.Count > 0 Then
-        GetCellLinkPath = Trim$(CStr(c.Hyperlinks(1).Address))
+        GetCellLinkPath = ResolveLinkPath(Trim$(CStr(c.Hyperlinks(1).Address)), c.Worksheet.Parent)
     Else
         GetCellLinkPath = Trim$(CStr(c.Value))
     End If
@@ -583,6 +583,77 @@ ReadFailed:
         Err.Raise 18
     End If
     GetCellLinkPath = ""
+End Function
+
+Private Function ResolveLinkPath(ByVal addr As String, ByVal wb As Workbook) As String
+    Dim fso As Object
+    Dim basePath As String
+    Dim operationError As Long
+
+    addr = Trim$(addr)
+    ResolveLinkPath = addr
+    If Len(addr) = 0 Then Exit Function
+    If addr Like "[A-Za-z]:*" Then Exit Function
+    If Left$(addr, 2) = "\\" Then Exit Function
+    If Left$(addr, 2) = "//" Then Exit Function
+    If InStr(1, addr, "://", vbTextCompare) > 0 Then Exit Function
+    If LCase$(Left$(addr, 5)) = "file:" Then Exit Function
+
+    On Error Resume Next
+    Err.Clear
+    basePath = CStr(wb.BuiltinDocumentProperties("Hyperlink base").Value)
+    operationError = Err.Number
+    If operationError = 18 Then
+        On Error GoTo 0
+        Err.Raise 18
+    End If
+    If operationError <> 0 Then
+        Err.Clear
+        basePath = ""
+    End If
+
+    If Len(basePath) = 0 Then
+        basePath = wb.Path
+        operationError = Err.Number
+        If operationError = 18 Then
+            On Error GoTo 0
+            Err.Raise 18
+        End If
+        If operationError <> 0 Then
+            Err.Clear
+            On Error GoTo 0
+            Exit Function
+        End If
+    End If
+
+    If Len(basePath) = 0 Or InStr(1, basePath, "://", vbTextCompare) > 0 Then
+        On Error GoTo 0
+        Exit Function
+    End If
+
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    operationError = Err.Number
+    If operationError = 18 Then
+        On Error GoTo 0
+        Err.Raise 18
+    End If
+    If operationError <> 0 Then
+        Err.Clear
+        On Error GoTo 0
+        Exit Function
+    End If
+
+    ResolveLinkPath = fso.GetAbsolutePathName(fso.BuildPath(basePath, Replace(addr, "/", "\\")))
+    operationError = Err.Number
+    If operationError = 18 Then
+        On Error GoTo 0
+        Err.Raise 18
+    End If
+    If operationError <> 0 Then
+        Err.Clear
+        ResolveLinkPath = addr
+    End If
+    On Error GoTo 0
 End Function
 
 Private Function NormalizeFilePath(ByVal value As String) As String
