@@ -29,6 +29,8 @@ Public Sub AnonymizeTextData()
     Dim oldDisplayAlerts As Boolean
     Dim oldCalculation As XlCalculation
     Dim copyCreated As Boolean
+    Dim errorNumber As Long
+    Dim errorDescription As String
 
     oldScreenUpdating = Application.ScreenUpdating
     oldEnableEvents = Application.EnableEvents
@@ -114,6 +116,7 @@ Public Sub AnonymizeTextData()
                     "Исходный файл останется без изменений." & vbCrLf & vbCrLf & _
                     "Текстовые значения в столбцах без формул будут заменены на заголовок столбца и номер." & vbCrLf & _
                     "Даты, числа и формулы останутся без изменений." & vbCrLf & vbCrLf & _
+                    IIf(LCase$(extension) = ".xlsm", "ВНИМАНИЕ: копия сохранит VBA-проект исходной книги. В коде макросов могут остаться конфиденциальные сведения." & vbCrLf & vbCrLf, "") & _
                     "Продолжить?", vbQuestion + vbYesNo + vbDefaultButton2, "Подтверждение обезличивания")
 
     If answer <> vbYes Then Exit Sub
@@ -190,6 +193,8 @@ Public Sub AnonymizeTextData()
     Exit Sub
 
 ErrorHandler:
+    errorNumber = Err.Number
+    errorDescription = Err.Description
     On Error Resume Next
 
     If Not wbCopy Is Nothing Then wbCopy.Close SaveChanges:=False
@@ -203,8 +208,8 @@ ErrorHandler:
         If Len(Dir$(CStr(savePath))) > 0 Then Kill CStr(savePath)
     End If
 
-    Debug.Print "Ошибка обезличивания: " & Err.Number & " — " & Err.Description
-    MsgBox "Не удалось завершить обезличивание." & vbCrLf & Err.Number & " — " & Err.Description & vbCrLf & _
+    Debug.Print "Ошибка обезличивания: " & errorNumber & " — " & errorDescription
+    MsgBox "Не удалось завершить обезличивание." & vbCrLf & errorNumber & " — " & errorDescription & vbCrLf & _
            "Исходная книга не изменена.", vbCritical
 End Sub
 
