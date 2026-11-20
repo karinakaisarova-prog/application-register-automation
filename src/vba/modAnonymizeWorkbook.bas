@@ -75,6 +75,7 @@ Public Sub AnonymizeTextData()
     ReDim formulaColumns(1 To lastCol)
 
     For col = 1 To lastCol
+        If ws.Cells(headerRow, col).HasFormula Then formulaColumns(col) = True
         For rowNum = headerRow + 1 To lastRow
             If ws.Cells(rowNum, col).HasFormula Then
                 formulaColumns(col) = True
@@ -215,7 +216,11 @@ Private Function HeaderContainsDate(ByVal headerText As String) As Boolean
     HeaderContainsDate = _
         (InStr(1, normalizedText, "дата", vbTextCompare) > 0) Or _
         (InStr(1, normalizedText, "date", vbTextCompare) > 0) Or _
-        (InStr(1, normalizedText, "период", vbTextCompare) > 0)
+        (InStr(1, normalizedText, "период", vbTextCompare) > 0) Or _
+        (InStr(1, normalizedText, "месяц", vbTextCompare) > 0) Or _
+        (InStr(1, normalizedText, "год", vbTextCompare) > 0) Or _
+        (InStr(1, normalizedText, "время", vbTextCompare) > 0) Or _
+        (InStr(1, normalizedText, "time", vbTextCompare) > 0)
 End Function
 
 Private Function LooksLikeDate(ByVal cellText As String) As Boolean
