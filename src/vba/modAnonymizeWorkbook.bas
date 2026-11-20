@@ -1,4 +1,3 @@
-Attribute VB_Name = "modAnonymizeWorkbook"
 Option Explicit
 
 Public Sub AnonymizeTextData()
@@ -54,7 +53,7 @@ Public Sub AnonymizeTextData()
         Exit Sub
     End If
 
-    Set foundCell = ws.Cells.Find(What:="*", After:=ws.Cells(1, 1), LookIn:=xlFormulas, LookAt:=xlPart, SearchOrder:=xlByRows, SearchDirection:=xlNext, MatchCase:=False)
+    Set foundCell = ws.Cells.Find(What:="*", After:=ws.Cells(ws.Rows.Count, ws.Columns.Count), LookIn:=xlFormulas, LookAt:=xlPart, SearchOrder:=xlByRows, SearchDirection:=xlNext, MatchCase:=False)
 
     If foundCell Is Nothing Then
         MsgBox "На листе нет данных.", vbInformation
