@@ -163,7 +163,8 @@ Public Function ResolveLinkPath(ByVal addr As String, ByVal wb As Workbook) As S
     ResolveLinkPath = addr
     If Len(addr) = 0 Then Exit Function
     If addr Like "[A-Za-z]:*" Then Exit Function
-    If Left$(addr, 2) = "\\" Or Left$(addr, 2) = "//" Then Exit Function
+    If Left$(addr, 2) = "\\" Then Exit Function
+    If Left$(addr, 2) = "//" Then Exit Function
     If InStr(1, addr, "://", vbTextCompare) > 0 Then Exit Function
     If LCase$(Left$(addr, 5)) = "file:" Then Exit Function
 
