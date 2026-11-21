@@ -6,6 +6,8 @@
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $vbaDir = Join-Path $repoRoot "src\vba"
 $moduleFiles = @(
+    "modAnonymizeWorkbook.bas",
+    "mod1CReportFormatter.bas",
     "modWorkbookContext.bas",
     "modRegisterPanel.bas",
     "modApplicationsList.bas",
