@@ -588,7 +588,9 @@ End Function
 Private Function ResolveLinkPath(ByVal addr As String, ByVal wb As Workbook) As String
     Dim fso As Object
     Dim basePath As String
+    Dim workbookPath As String
     Dim operationError As Long
+    Dim baseIsAbsolute As Boolean
 
     addr = Trim$(addr)
     ResolveLinkPath = addr
@@ -613,6 +615,7 @@ Private Function ResolveLinkPath(ByVal addr As String, ByVal wb As Workbook) As 
     End If
 
     If Len(basePath) = 0 Then
+        Err.Clear
         basePath = wb.Path
         operationError = Err.Number
         If operationError = 18 Then
@@ -643,7 +646,55 @@ Private Function ResolveLinkPath(ByVal addr As String, ByVal wb As Workbook) As 
         Exit Function
     End If
 
-    ResolveLinkPath = fso.GetAbsolutePathName(fso.BuildPath(basePath, Replace(addr, "/", "\")))
+    basePath = Replace(basePath, "/", "\\")
+    baseIsAbsolute = False
+    If Len(basePath) >= 3 Then
+        baseIsAbsolute = (Mid$(basePath, 2, 1) = ":" And Mid$(basePath, 3, 1) = "\\")
+    End If
+    If Left$(basePath, 2) = "\\\\" Then baseIsAbsolute = True
+
+    If Not baseIsAbsolute Then
+        If (Len(basePath) >= 2 And Mid$(basePath, 2, 1) = ":") Or Left$(basePath, 1) = "\\" Then
+            On Error GoTo 0
+            Exit Function
+        End If
+
+        Err.Clear
+        workbookPath = CStr(wb.Path)
+        operationError = Err.Number
+        If operationError = 18 Then
+            On Error GoTo 0
+            Err.Raise 18
+        End If
+        If operationError <> 0 Then
+            Err.Clear
+            On Error GoTo 0
+            Exit Function
+        End If
+
+        workbookPath = Replace(workbookPath, "/", "\\")
+        If Not ((Len(workbookPath) >= 3 And Mid$(workbookPath, 2, 1) = ":" And Mid$(workbookPath, 3, 1) = "\\") Or _
+                Left$(workbookPath, 2) = "\\\\") Then
+            On Error GoTo 0
+            Exit Function
+        End If
+
+        Err.Clear
+        basePath = fso.GetAbsolutePathName(fso.BuildPath(workbookPath, basePath))
+        operationError = Err.Number
+        If operationError = 18 Then
+            On Error GoTo 0
+            Err.Raise 18
+        End If
+        If operationError <> 0 Then
+            Err.Clear
+            On Error GoTo 0
+            Exit Function
+        End If
+    End If
+
+    Err.Clear
+    ResolveLinkPath = fso.GetAbsolutePathName(fso.BuildPath(basePath, Replace(addr, "/", "\\")))
     operationError = Err.Number
     If operationError = 18 Then
         On Error GoTo 0
