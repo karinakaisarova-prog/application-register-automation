@@ -155,6 +155,9 @@ End Function
 Public Function ResolveLinkPath(ByVal addr As String, ByVal wb As Workbook) As String
     Dim fso As Object
     Dim basePath As String
+    Dim workbookPath As String
+    Dim operationError As Long
+    Dim baseIsAbsolute As Boolean
 
     addr = Trim$(addr)
     ResolveLinkPath = addr
@@ -165,16 +168,107 @@ Public Function ResolveLinkPath(ByVal addr As String, ByVal wb As Workbook) As S
     If LCase$(Left$(addr, 5)) = "file:" Then Exit Function
 
     On Error Resume Next
-    basePath = CStr(wb.BuiltinDocumentProperties("Hyperlink base").Value)
-    If Err.Number = 18 Then On Error GoTo 0: Err.Raise 18
     Err.Clear
-    If Len(basePath) = 0 Then basePath = wb.Path
-    If Len(basePath) = 0 Or InStr(1, basePath, "://", vbTextCompare) > 0 Then Exit Function
+    basePath = CStr(wb.BuiltinDocumentProperties("Hyperlink base").Value)
+    operationError = Err.Number
+    If operationError = 18 Then
+        On Error GoTo 0
+        Err.Raise 18
+    End If
+    If operationError <> 0 Then
+        Err.Clear
+        basePath = ""
+    End If
+
+    If Len(basePath) = 0 Then
+        Err.Clear
+        basePath = wb.Path
+        operationError = Err.Number
+        If operationError = 18 Then
+            On Error GoTo 0
+            Err.Raise 18
+        End If
+        If operationError <> 0 Then
+            Err.Clear
+            On Error GoTo 0
+            Exit Function
+        End If
+    End If
+
+    If Len(basePath) = 0 Or InStr(1, basePath, "://", vbTextCompare) > 0 Then
+        On Error GoTo 0
+        Exit Function
+    End If
 
     Set fso = CreateObject("Scripting.FileSystemObject")
+    operationError = Err.Number
+    If operationError = 18 Then
+        On Error GoTo 0
+        Err.Raise 18
+    End If
+    If operationError <> 0 Then
+        Err.Clear
+        On Error GoTo 0
+        Exit Function
+    End If
+
+    basePath = Replace(basePath, "/", "\")
+    baseIsAbsolute = False
+    If Len(basePath) >= 3 Then
+        baseIsAbsolute = (Mid$(basePath, 2, 1) = ":" And Mid$(basePath, 3, 1) = "\")
+    End If
+    If Left$(basePath, 2) = "\\" Then baseIsAbsolute = True
+
+    If Not baseIsAbsolute Then
+        If (Len(basePath) >= 2 And Mid$(basePath, 2, 1) = ":") Or Left$(basePath, 1) = "\" Then
+            On Error GoTo 0
+            Exit Function
+        End If
+
+        Err.Clear
+        workbookPath = CStr(wb.Path)
+        operationError = Err.Number
+        If operationError = 18 Then
+            On Error GoTo 0
+            Err.Raise 18
+        End If
+        If operationError <> 0 Then
+            Err.Clear
+            On Error GoTo 0
+            Exit Function
+        End If
+
+        workbookPath = Replace(workbookPath, "/", "\")
+        If Not ((Len(workbookPath) >= 3 And Mid$(workbookPath, 2, 1) = ":" And Mid$(workbookPath, 3, 1) = "\") Or _
+                Left$(workbookPath, 2) = "\\") Then
+            On Error GoTo 0
+            Exit Function
+        End If
+
+        Err.Clear
+        basePath = fso.GetAbsolutePathName(fso.BuildPath(workbookPath, basePath))
+        operationError = Err.Number
+        If operationError = 18 Then
+            On Error GoTo 0
+            Err.Raise 18
+        End If
+        If operationError <> 0 Then
+            Err.Clear
+            On Error GoTo 0
+            Exit Function
+        End If
+    End If
+
+    Err.Clear
     ResolveLinkPath = fso.GetAbsolutePathName(fso.BuildPath(basePath, Replace(addr, "/", "\")))
-    If Err.Number <> 0 Then
+    operationError = Err.Number
+    If operationError = 18 Then
+        On Error GoTo 0
+        Err.Raise 18
+    End If
+    If operationError <> 0 Then
         Err.Clear
         ResolveLinkPath = addr
     End If
+    On Error GoTo 0
 End Function
