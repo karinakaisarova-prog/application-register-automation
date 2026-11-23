@@ -193,9 +193,15 @@ Failed:
         Application.DisplayAlerts = False
         If Not rebuildStarted Then
             ' Исходный лист не менялся; удаляет только ненужную копию.
+            Err.Clear
             backupWs.Delete
-            Set backupWs = Nothing
-            LogLine "Формирование не началось; исходный лист оставлен без изменений."
+            If Err.Number = 0 Then
+                Set backupWs = Nothing
+                LogLine "Формирование не началось; исходный лист оставлен без изменений."
+            Else
+                Err.Clear
+                LogLine "Не удалось удалить временную резервную копию; она сохранена для восстановления."
+            End If
         Else
             ' Не удаляет повреждённый лист, пока резервная копия не получит его исходное имя.
             ' Если переименование не удалось, сохраняет резервную копию
