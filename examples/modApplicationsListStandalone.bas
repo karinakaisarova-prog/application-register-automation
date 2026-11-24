@@ -246,18 +246,19 @@ Failed:
             End If
         End If
     ElseIf Not targetWasExisting Then
-        Set ws = Nothing
-        If Len(Trim$(sheetName)) > 0 Then
-            On Error Resume Next
-            Set ws = FindWorksheet(sheetName)
-            On Error GoTo 0
-        End If
         If Not ws Is Nothing Then
-            Application.DisplayAlerts = False
+            Err.Clear
             ws.Delete
-            Application.DisplayAlerts = True
+            If Err.Number = 0 Then
+                Set ws = Nothing
+                LogLine "Новый неполный лист «" & sheetName & "» удалён."
+            Else
+                LogLine "Не удалось удалить новый неполный лист «" & sheetName & "»: " & Err.Description
+                Err.Clear
+            End If
+        Else
+            LogLine "Не удалось подтвердить удаление нового неполного листа «" & sheetName & "»: ссылка на лист недоступна."
         End If
-        LogLine "Новый неполный лист удалён."
     End If
     Application.StatusBar = False
     MsgBox IIf(cancelOrError, "Операция отменена.", "Не удалось завершить формирование перечня: " & errText) & _
