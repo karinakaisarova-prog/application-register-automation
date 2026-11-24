@@ -262,10 +262,19 @@ Failed:
             End If
         End If
     ElseIf createdNewSheet And Len(Trim$(sheetName)) > 0 Then
-        Set ws = Nothing
-        Set ws = GetRegisterWorkbook().Worksheets(sheetName)
-        If Not ws Is Nothing Then ws.Delete
-        LogApplicationsListLine "Новый неполный лист удалён."
+        If Not ws Is Nothing Then
+            Err.Clear
+            ws.Delete
+            If Err.Number = 0 Then
+                Set ws = Nothing
+                LogApplicationsListLine "Новый неполный лист «" & sheetName & "» удалён."
+            Else
+                LogApplicationsListLine "Не удалось удалить новый неполный лист «" & sheetName & "»: " & Err.Description
+                Err.Clear
+            End If
+        Else
+            LogApplicationsListLine "Не удалось подтвердить удаление нового неполного листа «" & sheetName & "»: ссылка на лист недоступна."
+        End If
     End If
     Application.StatusBar = False
     MsgBox IIf(cancelOrError, "Операция отменена.", "Не удалось завершить формирование перечня: " & errText) & _
