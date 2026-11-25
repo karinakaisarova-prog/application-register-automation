@@ -36,6 +36,8 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
     Dim oldCalculation As XlCalculation
     Dim cancelOrError As Boolean
     Dim errText As String
+    Dim restoreErrNumber As Long
+    Dim restoreErrText As String
     Dim backupWs As Worksheet
     Dim targetWasExisting As Boolean
     Dim rebuildStarted As Boolean
@@ -238,7 +240,14 @@ Failed:
                     Else
                         Err.Clear
                         damagedWs.Name = originalSheetName
-                        LogLine "Не удалось переименовать резервную копию в исходное имя. Резервная копия сохранена: " & backupWs.Name
+                        restoreErrNumber = Err.Number
+                        restoreErrText = Err.Description
+                        Err.Clear
+                        If restoreErrNumber = 0 Then
+                            LogLine "Не удалось переименовать резервную копию в исходное имя. Исходный лист возвращён к имени «" & originalSheetName & "»; резервная копия сохранена: " & backupWs.Name
+                        Else
+                            LogLine "Не удалось переименовать резервную копию или вернуть исходное имя повреждённому листу. Повреждённый лист сохранён: " & damagedWs.Name & "; резервная копия сохранена: " & backupWs.Name & ". Ошибка возврата имени: " & restoreErrNumber & " — " & restoreErrText
+                        End If
                     End If
                 Else
                     LogLine "Не удалось безопасно переименовать исходный лист. Резервная копия сохранена: " & backupWs.Name
