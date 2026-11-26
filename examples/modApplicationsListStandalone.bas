@@ -269,17 +269,16 @@ Failed:
             LogLine "Не удалось подтвердить удаление нового неполного листа «" & sheetName & "»: ссылка на лист недоступна."
         End If
     End If
+    If Not backupWs Is Nothing Then
+        ' Имя оставшейся копии добавляется до показа сообщения об ошибке.
+        LogLine "Резервная копия сохранена для проверки: " & backupWs.Name
+    End If
     Application.StatusBar = False
     MsgBox IIf(cancelOrError, "Операция отменена.", "Не удалось завершить формирование перечня: " & errText) & _
            vbCrLf & vbCrLf & mLogText, vbExclamation, "Перечень приложений"
 
 CleanExit:
     On Error Resume Next
-    If Not backupWs Is Nothing Then
-        ' После неудачного восстановления резервная копия может остаться единственной доступной копией.
-        ' Сохраняет её, не полагаясь на Err.Number, который мог быть сброшен.
-        LogLine "Резервная копия сохранена для проверки: " & backupWs.Name
-    End If
     Application.ScreenUpdating = oldScreenUpdating
     Application.EnableEvents = oldEnableEvents
     Application.DisplayAlerts = oldDisplayAlerts
