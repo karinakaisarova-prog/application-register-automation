@@ -110,8 +110,18 @@ Public Sub CreateMultiFolderApplicationsListCorrected()
     ' Это не зависит от наличия вспомогательной функции в старой версии модуля.
     Dim registerWb As Workbook
     Dim candidateWs As Worksheet
+    Dim leftoverRecoverySheets As String
 
     Set registerWb = GetRegisterWorkbook()
+    leftoverRecoverySheets = GetLeftoverRecoverySheetNames(registerWb)
+    If Len(leftoverRecoverySheets) > 0 Then
+        LogApplicationsListLine "Обнаружены листы восстановления от предыдущих запусков: " & Replace(leftoverRecoverySheets, vbCrLf, "; ")
+        If MsgBox("Обнаружены листы восстановления от предыдущих запусков:" & vbCrLf & _
+                  leftoverRecoverySheets & vbCrLf & vbCrLf & _
+                  "Они не будут удалены или перезаписаны автоматически." & vbCrLf & _
+                  "Продолжить формирование перечня?", _
+                  vbYesNo + vbExclamation + vbDefaultButton2, "Проверка остатков восстановления") <> vbYes Then GoTo CleanExit
+    End If
     Set ws = Nothing
     For Each candidateWs In registerWb.Worksheets
         If StrComp(candidateWs.Name, sheetName, vbTextCompare) = 0 Then
@@ -322,6 +332,26 @@ PanelFailed:
     LogApplicationsListLine "Не удалось создать панель кнопок. Ошибка " & failureNumber & ": " & failureDescription
     Err.Clear
 End Sub
+
+Private Function GetLeftoverRecoverySheetNames(ByVal wb As Workbook) As String
+    Dim recoveryWs As Worksheet
+    Dim sheetName As String
+    Dim result As String
+
+    For Each recoveryWs In wb.Worksheets
+        sheetName = recoveryWs.Name
+        If StrComp(sheetName, "_bak_register", vbTextCompare) = 0 Or _
+           StrComp(Left$(sheetName, Len("_bak_register_")), "_bak_register_", vbTextCompare) = 0 Or _
+           StrComp(sheetName, "_failed_register", vbTextCompare) = 0 Or _
+           StrComp(Left$(sheetName, Len("_failed_register_")), "_failed_register_", vbTextCompare) = 0 Or _
+           StrComp(Left$(sheetName, Len("_failed_reg_")), "_failed_reg_", vbTextCompare) = 0 Then
+            If Len(result) > 0 Then result = result & vbCrLf
+            result = result & sheetName
+        End If
+    Next recoveryWs
+
+    GetLeftoverRecoverySheetNames = result
+End Function
 
 Private Function GetUniqueRecoverySheetName() As String
     Dim candidate As String
