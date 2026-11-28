@@ -50,6 +50,9 @@ End Sub
 Public Function GetRegisterWorkbook() As Workbook
     Dim wb As Workbook
     Dim ws As Worksheet
+    Dim candidateWb As Workbook
+    Dim candidateNames As String
+    Dim candidateCount As Long
 
     If Not gRegisterWorkbook Is Nothing Then
         Set ws = TryGetWorksheet(gRegisterWorkbook, "data")
@@ -79,11 +82,22 @@ Public Function GetRegisterWorkbook() As Workbook
     For Each wb In Application.Workbooks
         Set ws = TryGetWorksheet(wb, "data")
         If Not ws Is Nothing Then
-            Set gRegisterWorkbook = wb
-            Set GetRegisterWorkbook = wb
-            Exit Function
+            candidateCount = candidateCount + 1
+            If Len(candidateNames) > 0 Then candidateNames = candidateNames & vbCrLf
+            candidateNames = candidateNames & wb.FullName
+            If candidateWb Is Nothing Then Set candidateWb = wb
         End If
     Next wb
+
+    If candidateCount = 1 Then
+        Set gRegisterWorkbook = candidateWb
+        Set GetRegisterWorkbook = candidateWb
+        Exit Function
+    ElseIf candidateCount > 1 Then
+        Err.Raise vbObjectError + 2102, "GetRegisterWorkbook", _
+                  "Обнаружено несколько открытых книг с листом 'data':" & vbCrLf & candidateNames & vbCrLf & _
+                  "Запустите макрос из подготовленной книги, чтобы однозначно определить место формирования перечня."
+    End If
 
     For Each wb In Application.Workbooks
         For Each ws In wb.Worksheets
